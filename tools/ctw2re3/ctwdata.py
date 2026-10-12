@@ -218,8 +218,8 @@ class WorldMap:
                     self.grid[(c, r)] = rid
 
     def instances(self, c, r):
-        """Yields ('model', key, Model, matrix) or ('water', key, (cx, cy, z, sea)) for each object block (c, r)
-        lists. The key identifies an object listed by several neighbouring blocks."""
+        """Yields ('model', key, Model, matrix, render list index) or ('water', key, (cx, cy, z, sea)) for each
+        object block (c, r) lists. The key identifies an object listed by several neighbouring blocks."""
         rid = self.grid.get((c, r))
         if rid is None:
             return
@@ -237,7 +237,7 @@ class WorldMap:
             inst0 = so + 0x34 + n_groups * 16
             for k in range(n_inst):
                 io = inst0 + k * 16
-                slot, = struct.unpack_from('<H', b, io)
+                slot, list_idx = struct.unpack_from('<HB', b, io)
                 model_id, off = struct.unpack_from('<II', b, io + 4)
                 if off + 0x30 > len(b) or b[off:off + 2] != b'MG':
                     continue
@@ -257,7 +257,23 @@ class WorldMap:
                     m = Model(b, off)
                 except ValueError:
                     continue
-                yield 'model', key, m, (M, T)
+                yield 'model', key, m, (M, T), list_idx
+
+
+# ---------------------------------------------------------------------------------------------------- render tables
+ADDITIVE_LISTS = (4, 6)      # CTW-Native's world renderer: lists 4 and 6 blend GL_SRC_ALPHA, GL_ONE
+
+
+def load_render_lists(data_dir):
+    """renderList[9] from render_tables.bin, which the CTW-Native Porter extracts from the game's binary: maps an
+    instance's render list index to the list its translucent batches are drawn in. None if the file is missing."""
+    path = os.path.join(data_dir, 'render_tables.bin')
+    if not os.path.exists(path):
+        return None
+    d = open(path, 'rb').read()
+    if d[:8] != b'CTWREND1' or len(d) < 8 + 36:
+        return None
+    return list(struct.unpack_from('<9i', d, 8))
 
 
 # ---------------------------------------------------------------------------------------------------- world.bin

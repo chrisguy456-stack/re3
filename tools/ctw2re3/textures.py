@@ -306,6 +306,69 @@ def opaque(t):
     return Texture(t.w, t.h, 'dxt1', b''.join(blocks), False)
 
 
+# ---------------------------------------------------------------------------------------------------- S3TC
+def _565(c):
+    return (_expand(c >> 11, 5), _expand((c >> 5) & 63, 6), _expand(c & 31, 5))
+
+
+def _colour_block(b, four_colour):
+    c0, c1, bits = struct.unpack('<HHI', b)
+    p0, p1 = _565(c0), _565(c1)
+    if four_colour or c0 > c1:
+        pal = [p0 + (255,), p1 + (255,), tuple((2 * a + b_) // 3 for a, b_ in zip(p0, p1)) + (255,),
+               tuple((a + 2 * b_) // 3 for a, b_ in zip(p0, p1)) + (255,)]
+    else:
+        pal = [p0 + (255,), p1 + (255,), tuple((a + b_) // 2 for a, b_ in zip(p0, p1)) + (255,), (0, 0, 0, 0)]
+    return [pal[(bits >> (2 * i)) & 3] for i in range(16)]
+
+
+def decode(t):
+    """Any Texture -> w * h * 4 RGBA bytes."""
+    if t.kind == 'rgba':
+        return t.data
+    out = bytearray(t.w * t.h * 4)
+    step = 8 if t.kind == 'dxt1' else 16
+    nbx = t.w // 4
+    for k, o in enumerate(range(0, nbx * (t.h // 4) * step, step)):
+        bx, by = k % nbx, k // nbx
+        if t.kind == 'dxt1':
+            px = _colour_block(t.data[o:o + 8], False)
+        else:
+            px = _colour_block(t.data[o + 8:o + 16], True)
+            if t.kind == 'dxt3':
+                a = int.from_bytes(t.data[o:o + 8], 'little')
+                alphas = [_expand((a >> (4 * i)) & 15, 4) for i in range(16)]
+            else:
+                a0, a1 = t.data[o], t.data[o + 1]
+                bits = int.from_bytes(t.data[o + 2:o + 8], 'little')
+                if a0 > a1:
+                    pal = [a0, a1] + [((7 - i) * a0 + i * a1) // 7 for i in range(1, 7)]
+                else:
+                    pal = [a0, a1] + [((5 - i) * a0 + i * a1) // 5 for i in range(1, 5)] + [0, 255]
+                alphas = [pal[(bits >> (3 * i)) & 7] for i in range(16)]
+            px = [p[:3] + (alphas[i],) for i, p in enumerate(px)]
+        for i, p in enumerate(px):
+            x, y = bx * 4 + (i & 3), by * 4 + (i >> 2)
+            q = (y * t.w + x) * 4
+            out[q:q + 4] = bytes(p)
+    return bytes(out)
+
+
+def additive(t):
+    """For batches CTW blends additively (GL_SRC_ALPHA, GL_ONE: glows, lit windows), which re3's buildings cannot
+    do: the texture as normal alpha blending that gives nearly the same picture. Alpha becomes the brightest channel
+    and the colour is scaled up to match, so black parts vanish instead of covering what is behind them."""
+    px = bytearray(decode(t))
+    for q in range(0, len(px), 4):
+        r, g, b, a = px[q:q + 4]
+        m = max(r, g, b)
+        if m == 0:
+            px[q:q + 4] = b'\0\0\0\0'
+            continue
+        px[q:q + 4] = bytes((r * 255 // m, g * 255 // m, b * 255 // m, m * a // 255))
+    return Texture(t.w, t.h, 'rgba', bytes(px), True)
+
+
 def placeholder():
     """4 x 4 magenta: makes a texture the converter could not read easy to spot in game."""
     return Texture(4, 4, 'rgba', bytes((255, 0, 255, 255)) * 16, False)

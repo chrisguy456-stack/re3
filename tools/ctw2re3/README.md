@@ -12,7 +12,9 @@ pedestrians, missions, CTW's own vehicles and characters, real water (swimming, 
 - GTA 3 for PC (your own copy) and a build of re3 from this branch.
 - GTA: Chinatown Wars for Android **4.4.243** (your own copy), ported with the
   [CTW-Native](https://github.com/official-kryo-to/ctw-native) Porter. Its output folder has a `data/` folder
-  with `game.pak`, `dxt.bin`, `rom.toc` and `rom.wad`; that folder is what the converter reads.
+  with `game.pak`, `dxt.bin`, `rom.toc` and `rom.wad`; that folder is what the converter reads. It also has
+  `render_tables.bin`, which says which see-through surfaces (lit windows, glows) CTW blends additively; without it
+  the converter guesses, so point it at the Porter's folder rather than files copied out of the APK.
 - Python 3.8 or newer (no extra packages).
 
 Neither game's files are part of this repository; the converter only runs on files you provide.

@@ -158,6 +158,7 @@ def _init_worker(data_dir):
     dxt = ctwdata.DxtBin(dxt_path) if os.path.exists(dxt_path) else None
     _worker['world'] = ctwdata.WorldMap(pak)
     _worker['tex'] = ctwtex.TextureSource(pak, dxt)
+    _worker['lists'] = ctwdata.load_render_lists(data_dir)
 
 
 def prelight(n, lit):
@@ -168,9 +169,14 @@ def prelight(n, lit):
     return (v, v, v, 255)
 
 
+def see_through(mk):
+    """Whether a material (texture name, rgba) needs blending: translucent batches, whatever their alpha."""
+    return mk[1][3] < 255 or (mk[0] is not None and mk[0][0] in 'ta')
+
+
 def build_block(job):
     (c, r), keys, col, zoff = job
-    world, texsrc = _worker['world'], _worker['tex']
+    world, texsrc, lists = _worker['world'], _worker['tex'], _worker['lists']
     ox, oy = ctwdata.block_centre(c, r)
     tris = []    # (material key, [(p, n, uv, colour)] x 3)
     for item in world.instances(c, r):
@@ -186,13 +192,21 @@ def build_block(job):
             v = [(p[i], (0, 0, 1), uv[i], (255, 255, 255, 255)) for i in range(4)]
             tris += [(mk, [v[0], v[1], v[2]]), (mk, [v[0], v[2], v[3]])]
             continue
-        _, _, m, (M, T) = item
+        _, _, m, (M, T), list_idx = item
         for mb, tri in m.triangles():
             translucent = bool(mb['flags'] & 0x08)
             alpha = int(round((mb['alpha'] >> 3) / 31 * 255)) if translucent else 255
-            # CTW draws opaque batches without blending, ignoring the texture's alpha: those use an 'o' copy of the
-            # texture with its alpha thrown away; translucent batches use the texture as it is ('t')
-            mk = (('t%d' if translucent else 'o%d') % mb['texture'], (255, 255, 255, alpha))
+            # Texture name prefixes: CTW draws opaque batches without blending, ignoring the texture's alpha, so
+            # those use an 'o' copy with its alpha thrown away. Translucent batches in an additive render list
+            # (lit windows, glows) use an 'a' copy made for normal blending; the rest use the texture as it is, 't'.
+            if not translucent:
+                prefix = 'o'
+            elif lists is not None:
+                prefix = 'a' if list_idx < 9 and lists[list_idx] in ctwdata.ADDITIVE_LISTS else 't'
+            else:
+                # without render_tables.bin: additive layers are the translucent ones whose texture has no alpha
+                prefix = 't' if texsrc.get(mb['texture']).alpha else 'a'
+            mk = (prefix + str(mb['texture']), (255, 255, 255, alpha))
             lit = bool(mb['flags'] & 0x07)
             out = []
             for p, n, uv in tri:
@@ -208,7 +222,7 @@ def build_block(job):
     for want_translucent in (False, True):
         by_mat = {}
         for mk, t in tris:
-            if (mk[1][3] < 255) == want_translucent:
+            if see_through(mk) == want_translucent:
                 by_mat.setdefault(mk, []).append(t)
         cur, verts = [], 0
         for mk, ts in by_mat.items():
@@ -242,8 +256,8 @@ def build_block(job):
             mesh.tris.append((a, b, c_, mat))
         name = model_name(c, r, i)
         texnames = sorted({t for t, _ in mesh.materials if t})
-        txd = rwwriter.write_txd([(n, texsrc.get(int(n[1:])) if n[0] == 't' else ctwtex.opaque(texsrc.get(int(n[1:]))))
-                                  for n in texnames])
+        variant = {'t': lambda t: t, 'o': ctwtex.opaque, 'a': ctwtex.additive}
+        txd = rwwriter.write_txd([(n, variant[n[0]](texsrc.get(int(n[1:])))) for n in texnames])
         lo, hi = mesh.bounds()
         boxes, cverts, ctris = [], [], []
         if i == 0:
@@ -265,7 +279,7 @@ def build_block(job):
                 lo = tuple(min([lo[k]] + [p[k] for p in pts]) for k in range(3))
                 hi = tuple(max([hi[k]] + [p[k] for p in pts]) for k in range(3))
         colm = gtaformats.col1(name, lo, hi, boxes, cverts, ctris)
-        translucent = any(cc[3] < 255 for _, cc in mesh.materials)
+        translucent = any(see_through(mk) for mk in mesh.materials)
         out.append(dict(name=name, dff=rwwriter.write_dff(mesh), txd=txd, col=colm, flags=4 if translucent else 0,
                         pos=(ox, oy, 0.0), verts=len(mesh.pos), tris=len(mesh.tris),
                         coltris=len(ctris), dropped=max(0, len(col['tris']) - MAX_COL_TRIS) if i == 0 else 0,
@@ -298,6 +312,9 @@ def main(argv=None):
         c0, r0, c1, r1 = (int(v) for v in a.area.split(','))
         blocks = [b for b in blocks if c0 <= b[0] <= c1 and r0 <= b[1] <= r1]
     print('%d city blocks' % len(blocks))
+    if ctwdata.load_render_lists(a.ctw_data) is None:
+        print('warning: render_tables.bin not found (the CTW-Native Porter writes it next to game.pak); guessing which '
+              'see-through surfaces CTW draws additively')
     plan = assign_objects(world)
     wb = ctwdata.load_world_bin(a.ctw_data)
     if wb is None:

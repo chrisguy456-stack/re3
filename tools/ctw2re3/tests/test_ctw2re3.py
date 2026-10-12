@@ -123,6 +123,20 @@ class ConvertFixture(unittest.TestCase):
             for x0, y0, x1, y1, z in rects:   # no rectangle crosses a block edge
                 self.assertEqual(ctwdata.block_of(x0 + 1e-3, y0 + 1e-3), ctwdata.block_of(x1 - 1e-3, y1 - 1e-3))
 
+    def test_dxt_decode_and_additive_copy(self):
+        # one DXT1 block: colour0 white, colour1 black, left half index 0 (white), right half index 1 (black)
+        bits = 0
+        for i in range(16):
+            bits |= (0 if (i & 3) < 2 else 1) << (2 * i)
+        t = ctwtex.Texture(4, 4, 'dxt1', struct.pack('<HHI', 0xFFFF, 0x0000, bits), False)
+        px = ctwtex.decode(t)
+        self.assertEqual(px[0:4], bytes((255, 255, 255, 255)))
+        self.assertEqual(px[12:16], bytes((0, 0, 0, 255)))
+        a = ctwtex.additive(t)
+        self.assertTrue(a.alpha)
+        self.assertEqual(a.data[0:4], bytes((255, 255, 255, 255)))   # bright: kept, opaque
+        self.assertEqual(a.data[12:16], bytes((0, 0, 0, 0)))         # black: adds nothing, so fully see-through
+
     def test_librw_reads_everything(self):
         exe = os.environ.get('RWCHECK')
         if not exe:
@@ -134,3 +148,27 @@ class ConvertFixture(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RenderLists(unittest.TestCase):
+    """render_tables.bin decides which translucent batches CTW draws additively."""
+
+    def convert(self, list0):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        data, out = os.path.join(tmp.name, 'ctw'), os.path.join(tmp.name, 'gta3')
+        make_fixture.main(data)
+        with open(os.path.join(data, 'render_tables.bin'), 'wb') as f:   # the fixture's instances use list index 0
+            f.write(b'CTWREND1' + struct.pack('<9i', list0, *range(1, 9)) + bytes(24 + 64 + 32))
+        ctw2re3.main(['--ctw-data', data, '--out', out, '--jobs', '1'])
+        return b''.join(read_img(out).values())
+
+    def test_additive_list(self):
+        files = self.convert(4)
+        self.assertIn(b'a5\0', files)
+        self.assertNotIn(b't5\0', files)
+
+    def test_blended_list(self):
+        files = self.convert(1)
+        self.assertIn(b't5\0', files)
+        self.assertNotIn(b'a5\0', files)
