@@ -753,6 +753,18 @@ CStreaming::RequestModel(int32 id, int32 flags)
 {
 	CSimpleModelInfo *mi;
 
+#ifdef CTW_PROTOTYPE
+	// Liberty City code can ask for models a CTW build never defined; skip those instead of crashing, and log them
+	if(id < 0 || id >= NUMSTREAMINFO || id < STREAM_OFFSET_TXD && CModelInfo::GetModelInfo(id) == nil){
+		static int numLogged = 0;
+		if(numLogged < 50){
+			numLogged++;
+			debug("CTW: skipped a request for undefined model %d\n", id);
+		}
+		return;
+	}
+#endif
+
 	if(ms_aInfoForModel[id].m_loadState == STREAMSTATE_INQUEUE){
 		// updgrade to priority
 		if(flags & STREAMFLAGS_PRIORITY && !ms_aInfoForModel[id].IsPriority()){
