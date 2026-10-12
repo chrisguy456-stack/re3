@@ -15,6 +15,10 @@ public:
 
 	// Replaces the opening of main.scm: creates the player on the street, sets the camera behind them and fades in.
 	static void StartGame(void);
+
+	// Loads models/ctw_shared.txd, the textures many city blocks use, keeps it loaded and makes texture lookups
+	// fall back to it when a block's own dictionary doesn't have the texture.
+	static void LoadSharedTextures(void);
 };
 
 #endif

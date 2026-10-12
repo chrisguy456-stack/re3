@@ -33,6 +33,7 @@ It writes into the GTA 3 folder (it does not touch any original file):
 
 ```text
 models/ctw.img, models/ctw.dir      models and texture dictionaries per 120 x 120 city block
+models/ctw_shared.txd               textures used by many blocks, stored once and loaded at start-up
 data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
 data/maps/ctw/ctw.col               collision, plus a ground plane from the CTW ground map
 data/ctw.dat                        the level file the CTW build loads instead of gta3.dat
@@ -43,7 +44,8 @@ dictionaries there and would keep showing the textures of an earlier conversion.
 (a "converting textures" screen).
 
 `--area c0,r0,c1,r1` converts only some blocks (the grid is 59 x 42), which is handy for a quick first try.
-`--jobs N` sets the number of worker processes. The summary at the end lists any texture it could not read; those
+`--share-min N` (default 3) moves every texture used by at least N blocks into `ctw_shared.txd` instead of copying
+it into each block; without it the whole city would take about 10 GB. `--jobs N` sets the number of worker processes. The summary at the end lists any texture it could not read; those
 show up magenta in game.
 
 ## 2. Build re3 with the CTW option

@@ -137,6 +137,19 @@ def gather_collision(wc, blocks):
 
 
 # ------------------------------------------------------------------------------------------------ blocks
+def count_texture_blocks(world, plan, blocks):
+    """How many of the blocks use each CTW texture."""
+    counts = {}
+    for b in blocks:
+        used = set()
+        for item in world.instances(*b):
+            if item[0] == 'model' and item[1] in plan[b]:
+                used.update(mb['texture'] for mb in item[2].batches if mb['mask'])
+        for tid in used:
+            counts[tid] = counts.get(tid, 0) + 1
+    return counts
+
+
 def assign_objects(world):
     """CTW lists an object in every block it overlaps; each one is converted once, in the first block listing it."""
     owner, plan = set(), {}
@@ -168,6 +181,11 @@ def prelight(n, lit):
     d = max(0.0, n[0] * LIGHT_DIR[0] + n[1] * LIGHT_DIR[1] + n[2] * LIGHT_DIR[2])
     v = int(255 * min(1.0, 0.55 + 0.5 * d))
     return (v, v, v, 255)
+
+
+def texture_id(name):
+    """The CTW texture id a material texture name comes from (see texture_variant)."""
+    return int(name[1:].split('_')[0])
 
 
 def texture_variant(texsrc, name):
@@ -254,7 +272,7 @@ def see_through(mk):
 
 
 def build_block(job):
-    (c, r), keys, col, zoff = job
+    (c, r), keys, col, zoff, shared = job
     world, texsrc, lists = _worker['world'], _worker['tex'], _worker['lists']
     ox, oy = ctwdata.block_centre(c, r)
     tris = []    # (material key, [(p, n, uv, colour)] x 3)
@@ -358,7 +376,9 @@ def build_block(job):
             mesh.tris.append((a, b, c_, mat))
         name = model_name(c, r, i)
         texnames = sorted({t for t, _ in mesh.materials if t})
-        txd = rwwriter.write_txd([(n, texture_variant(texsrc, n)) for n in texnames])
+        # textures many blocks use live once, in the shared dictionary re3 keeps loaded (models/ctw_shared.txd)
+        shared_names = [n for n in texnames if texture_id(n) in shared]
+        txd = rwwriter.write_txd([(n, texture_variant(texsrc, n)) for n in texnames if texture_id(n) not in shared])
         lo, hi = mesh.bounds()
         boxes, cverts, ctris = [], [], []
         if i == 0:
@@ -381,7 +401,8 @@ def build_block(job):
                 hi = tuple(max([hi[k]] + [p[k] for p in pts]) for k in range(3))
         colm = gtaformats.col1(name, lo, hi, boxes, cverts, ctris)
         translucent = any(see_through(mk) for mk in mesh.materials)
-        out.append(dict(name=name, dff=rwwriter.write_dff(mesh), txd=txd, col=colm, flags=4 if translucent else 0,
+        out.append(dict(name=name, dff=rwwriter.write_dff(mesh), txd=txd, shared=shared_names, col=colm,
+                        flags=4 if translucent else 0,
                         pos=(ox, oy, 0.0), verts=len(mesh.pos), tris=len(mesh.tris),
                         coltris=len(ctris), dropped=max(0, len(col['tris']) - MAX_COL_TRIS) if i == 0 else 0,
                         maxz=hi[2]))
@@ -403,6 +424,8 @@ def main(argv=None):
     ap.add_argument('--z-offset', type=float, default=0.0, help='raise the whole city by this much')
     ap.add_argument('--area', help='only blocks c0,r0,c1,r1 (inclusive), for quick tests')
     ap.add_argument('--jobs', type=int, default=0, help='worker processes (default: all cores)')
+    ap.add_argument('--share-min', type=int, default=3,
+                    help='textures used by at least this many blocks go in the shared dictionary (default 3)')
     a = ap.parse_args(argv)
 
     t0 = time.time()
@@ -432,7 +455,11 @@ def main(argv=None):
     img = gtaformats.ImgWriter(os.path.join(models, 'ctw.img'))
     objs, insts, cols, missing = [], [], [], set()
     stats = dict(verts=0, tris=0, coltris=0, dropped=0, parts=0, maxz=0.0)
-    jobs = [(b, plan[b], col[b], a.z_offset) for b in blocks]
+    counts = count_texture_blocks(world, plan, blocks)
+    shared = {tid for tid, n in counts.items() if n >= a.share_min}
+    print('%d textures, %d of them shared by %d or more blocks' % (len(counts), len(shared), a.share_min))
+    shared_names = set()
+    jobs = [(b, plan[b], col[b], a.z_offset, shared) for b in blocks]
     procs = a.jobs or multiprocessing.cpu_count()
     with multiprocessing.Pool(procs, _init_worker, (a.ctw_data,)) as pool:
         for n, (b, parts, miss) in enumerate(pool.imap(build_block, jobs, chunksize=4)):
@@ -443,6 +470,7 @@ def main(argv=None):
                 insts.append((mid, p['name']) + p['pos'])
                 img.add(p['name'] + '.dff', p['dff'])
                 img.add(p['name'] + '.txd', p['txd'])
+                shared_names.update(p['shared'])
                 cols.append(p['col'])
                 for k in ('verts', 'tris', 'coltris', 'dropped'):
                     stats[k] += p[k]
@@ -451,6 +479,13 @@ def main(argv=None):
             if (n + 1) % 50 == 0 or n + 1 == len(jobs):
                 print('  %d / %d blocks (%.0fs)' % (n + 1, len(jobs), time.time() - t0))
     img.close(os.path.join(models, 'ctw.dir'))
+    _init_worker(a.ctw_data)
+    texsrc = _worker['tex']
+    shared_txd = rwwriter.write_txd([(n, texture_variant(texsrc, n)) for n in sorted(shared_names)])
+    write(os.path.join(models, 'ctw_shared.txd'), shared_txd)
+    missing.update(texsrc.missing)
+    print('shared textures: %d, %.1f MB in models/ctw_shared.txd; city blocks: %.1f MB in models/ctw.img'
+          % (len(shared_names), len(shared_txd) / 1e6, os.path.getsize(os.path.join(models, 'ctw.img')) / 1e6))
     # re3 keeps converted copies of every texture dictionary in models/txd.img, made on its first run, and loads
     # those instead of ours; a cache from an earlier conversion would be stale, so remove it and re3 rebuilds it
     for cache in ('txd.img', 'txd.dir'):

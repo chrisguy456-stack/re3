@@ -3,7 +3,8 @@
 // file parses the way CFileLoader::LoadCollisionFile reads it. Prints one line per file; exits 1 on any failure.
 // Textures that come out (nearly) all black are listed at the end. Pass - for the .col to check only an IMG, such
 // as the models/txd.img cache re3 builds on its first run.
-//   rwcheck models/ctw.img models/ctw.dir data/maps/ctw/ctw.col
+//   rwcheck models/ctw.img models/ctw.dir data/maps/ctw/ctw.col [models/ctw_shared.txd]
+// With the shared dictionary, models also find their textures there, as the CTW build of re3 does.
 #include <rw.h>
 #include <cstdio>
 #include <cstring>
@@ -12,6 +13,17 @@
 #include <map>
 
 static std::map<std::string, rw::TexDictionary*> dicts;
+static rw::TexDictionary *sharedTxd;
+static rw::Texture *(*prevFindCB)(const char *name);
+
+static rw::Texture*
+findWithShared(const char *name)
+{
+	rw::Texture *t = prevFindCB(name);
+	if(t == nil && sharedTxd)
+		t = sharedTxd->find(name);
+	return t;
+}
 
 using namespace rw;
 
@@ -151,6 +163,12 @@ int main(int argc, char **argv)
 	Engine::open(nil);
 	Engine::start();
 	std::vector<uint8> img = readFile(argv[1]), dir = readFile(argv[2]);
+	if(argc > 4){
+		std::vector<uint8> shared = readFile(argv[4]);
+		sharedTxd = checkTxd("ctw_shared.txd", shared.data(), (uint32)shared.size());
+		prevFindCB = Texture::findCB;
+		Texture::findCB = findWithShared;
+	}
 	// texture dictionaries first: a model's materials find their textures in the current dictionary, as in re3
 	for(int pass = 0; pass < 2; pass++)
 	for(size_t i = 0; i + 32 <= dir.size(); i += 32){

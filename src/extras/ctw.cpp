@@ -11,6 +11,8 @@
 #include "Population.h"
 #include "Restart.h"
 #include "Streaming.h"
+#include "TxdStore.h"
+#include "FileMgr.h"
 #include "World.h"
 
 const float CCtwPrototype::StartX = -1000.0f;
@@ -53,6 +55,37 @@ CCtwPrototype::StartGame(void)
 	TheCamera.RestoreWithJumpCut();
 	TheCamera.Fade(1.0f, FADE_IN);
 	debug("CTW: game started\n");
+}
+
+static rw::TexDictionary *sharedTxd;
+static rw::Texture *(*prevFindCB)(const char *name);
+
+static rw::Texture*
+FindWithSharedFallback(const char *name)
+{
+	rw::Texture *tex = prevFindCB(name);
+	if(tex == nil && sharedTxd)
+		tex = sharedTxd->find(name);
+	return tex;
+}
+
+void
+CCtwPrototype::LoadSharedTextures(void)
+{
+	// CTxdStore::LoadTxd waits for a file that doesn't exist, so check first
+	int file = CFileMgr::OpenFile("MODELS\\CTW_SHARED.TXD", "rb");
+	if(file == 0){
+		debug("CTW: models/ctw_shared.txd not found; convert the city again with tools/ctw2re3\n");
+		return;
+	}
+	CFileMgr::CloseFile(file);
+	int slot = CTxdStore::AddTxdSlot("ctw_shared");
+	CTxdStore::LoadTxd(slot, "MODELS\\CTW_SHARED.TXD");
+	CTxdStore::AddRef(slot);
+	sharedTxd = CTxdStore::GetSlot(slot)->texDict;
+	prevFindCB = rw::Texture::findCB;
+	rw::Texture::findCB = FindWithSharedFallback;
+	debug("CTW: loaded the shared city textures\n");
 }
 
 #endif

@@ -142,7 +142,8 @@ class ConvertFixture(unittest.TestCase):
         if not exe:
             self.skipTest('set RWCHECK to a built tests/rwcheck.cpp to check the files with librw')
         r = subprocess.run([exe, os.path.join(self.out, 'models', 'ctw.img'), os.path.join(self.out, 'models', 'ctw.dir'),
-                            os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.col')], capture_output=True, text=True)
+                            os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.col'),
+                            os.path.join(self.out, 'models', 'ctw_shared.txd')], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
@@ -210,3 +211,27 @@ class Facades(unittest.TestCase):
         t = ctw2re3.texture_variant(self.src, 'f9_16_0_32_32')
         self.assertEqual((t.w, t.h, t.kind), (16, 32, 'rgba'))
         self.assertEqual(t.data[:4], bytes((200, 150, 100, 255)))
+
+
+class SharedTextures(unittest.TestCase):
+    """Textures enough blocks use are written once, to models/ctw_shared.txd, instead of into every block."""
+
+    def test_shared_dictionary(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        data, out = os.path.join(tmp.name, 'ctw'), os.path.join(tmp.name, 'gta3')
+        make_fixture.main(data)
+        ctw2re3.main(['--ctw-data', data, '--out', out, '--jobs', '1', '--share-min', '2'])
+        files = read_img(out)
+        shared = open(os.path.join(out, 'models', 'ctw_shared.txd'), 'rb').read()
+        # the cube both blocks list is converted once, but the roof texture (4) and wall texture (6) of the
+        # fixture's objects appear in both blocks: those go in the shared dictionary and in no block's own
+        self.assertIn(b'o6\0', shared)
+        self.assertNotIn(b'o6\0', files['ctw_10_5.txd'] + files['ctw_11_5.txd'])
+        self.assertIn(b'o6\0', files['ctw_11_5.dff'])   # the models still name it
+        exe = os.environ.get('RWCHECK')
+        if exe:
+            r = subprocess.run([exe, os.path.join(out, 'models', 'ctw.img'), os.path.join(out, 'models', 'ctw.dir'),
+                                '-', os.path.join(out, 'models', 'ctw_shared.txd')], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn('[o6 a255]', r.stdout)      # found through the shared dictionary

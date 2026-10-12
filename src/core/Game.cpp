@@ -90,6 +90,7 @@
 #ifdef USE_TEXTURE_POOL
 #include "TexturePools.h"
 #endif
+#include "ctw.h"
 
 eLevelName CGame::currLevel;
 bool CGame::bDemoMode = true;
@@ -423,6 +424,9 @@ bool CGame::Initialise(const char* datFile)
 	int particleTxdSlot = CTxdStore::AddTxdSlot("particle");
 	CTxdStore::LoadTxd(particleTxdSlot, "MODELS/PARTICLE.TXD");
 	CTxdStore::AddRef(particleTxdSlot);
+#ifdef CTW_PROTOTYPE
+	CCtwPrototype::LoadSharedTextures();
+#endif
 	CTxdStore::SetCurrentTxd(gameTxdSlot);
 	LoadingScreen("Loading the Game", "Setup game variables", nil);
 	POP_MEMID();

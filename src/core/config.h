@@ -10,11 +10,15 @@ enum Config {
 	MAX_CDIMAGES = 8, // additional cdimages
 	MAX_CDCHANNELS = 5,
 
+#ifdef CTW_PROTOTYPE
+	MODELINFOSIZE = 12000,	// the whole Chinatown Wars city: an opaque and a see-through model per block, starting at id 1000
+#else
 	MODELINFOSIZE = 5500,	// 3150 on PS2
+#endif
 #if defined __MWERKS__ || defined VANILLA_DEFINES
 	TXDSTORESIZE = 850,
 #elif defined CTW_PROTOTYPE
-	TXDSTORESIZE = 4096,	// one texture dictionary per Chinatown Wars city block
+	TXDSTORESIZE = 8192,	// one texture dictionary per Chinatown Wars city model
 #else
 	TXDSTORESIZE = 1024,	// for Xbox map
 #endif
@@ -25,7 +29,11 @@ enum Config {
 #endif
 	CUTSCENEDIRSIZE = 512,
 
+#ifdef CTW_PROTOTYPE
+	SIMPLEMODELSIZE = 11000,
+#else
 	SIMPLEMODELSIZE = 5000,	// 2910 on PS2
+#endif
 	MLOMODELSIZE = 1,
 	MLOINSTANCESIZE = 1,
 	TIMEMODELSIZE = 30,
@@ -41,14 +49,22 @@ enum Config {
 
 	// Pool sizes
 #ifdef CTW_PROTOTYPE
-	NUMPTRNODES = 100000, // the Chinatown Wars blocks are 120 units across and span many sectors
+	NUMPTRNODES = 250000, // the Chinatown Wars blocks are 120 units across and span many sectors
 #else
 	NUMPTRNODES = 30000,  // 26000 on PS2
 #endif
+#ifdef CTW_PROTOTYPE
+	NUMENTRYINFOS = 12000,
+#else
 	NUMENTRYINFOS = 5400, // 3200 on PS2
+#endif
 	NUMPEDS = 140,        // 90 on PS2
 	NUMVEHICLES = 110,    // 70 on PS2
+#ifdef CTW_PROTOTYPE
+	NUMBUILDINGS = 12000,
+#else
 	NUMBUILDINGS = 5500,  // 4915 on PS2
+#endif
 	NUMTREADABLES = 1214,
 	NUMOBJECTS = 450,
 	NUMDUMMIES = 2802, // 2368 on PS2
