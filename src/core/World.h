@@ -11,14 +11,25 @@
 #define SECTOR_SIZE_X (40.0f)
 #define SECTOR_SIZE_Y (40.0f)
 
+#ifdef CTW_PROTOTYPE
+// The Chinatown Wars city spans x -3510..3570, y -2490..2550 (CTW-Native worldmap.h)
+#define NUMSECTORS_X (184)
+#define NUMSECTORS_Y (136)
+#else
 #define NUMSECTORS_X (100)
 #define NUMSECTORS_Y (100)
+#endif
 
 #define WORLD_SIZE_X (NUMSECTORS_X * SECTOR_SIZE_X)
 #define WORLD_SIZE_Y (NUMSECTORS_Y * SECTOR_SIZE_Y)
 
+#ifdef CTW_PROTOTYPE
+#define WORLD_MIN_X (-3680.0f)
+#define WORLD_MIN_Y (-2720.0f)
+#else
 #define WORLD_MIN_X (-2000.0f)
 #define WORLD_MIN_Y (-2000.0f)
+#endif
 
 #define WORLD_MAX_X (WORLD_MIN_X + WORLD_SIZE_X)
 #define WORLD_MAX_Y (WORLD_MIN_Y + WORLD_SIZE_Y)

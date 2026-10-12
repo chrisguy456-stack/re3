@@ -421,6 +421,9 @@ CTrain::OpenTrainDoor(float ratio)
 void
 CTrain::InitTrains(void)
 {
+#ifdef CTW_PROTOTYPE
+	return;	// their paths are in Liberty City
+#endif
 	int i, j;
 	CTrain *train;
 
@@ -672,6 +675,9 @@ ProcessTrainAnnouncements(void)
 void
 CTrain::UpdateTrains(void)
 {
+#ifdef CTW_PROTOTYPE
+	return;	// their paths are in Liberty City
+#endif
 	int i, j;
 	uint32 time;
 	float t, deltaT;

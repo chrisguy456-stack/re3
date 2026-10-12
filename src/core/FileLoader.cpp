@@ -214,21 +214,29 @@ CFileLoader::LoadCollisionFile(const char *filename)
 
 	while(CFileMgr::Read(fd, (char*)&header, sizeof(header))){
 		assert(header.ident == 'LLOC');
-		CFileMgr::Read(fd, (char*)work_buff, header.size);
-		memcpy(modelname, work_buff, 24);
+#ifdef CTW_PROTOTYPE
+		// a converted city block can hold more collision than work_buff
+		uint8 *buf = header.size > sizeof(work_buff) ? new uint8[header.size] : work_buff;
+#else
+		uint8 *buf = work_buff;
+#endif
+		CFileMgr::Read(fd, (char*)buf, header.size);
+		memcpy(modelname, buf, 24);
 
 		mi = CModelInfo::GetModelInfo(modelname, nil);
 		if(mi){
 			if(mi->GetColModel()){
-				LoadCollisionModel(work_buff+24, *mi->GetColModel(), modelname);
+				LoadCollisionModel(buf+24, *mi->GetColModel(), modelname);
 			}else{
 				CColModel *model = new CColModel;
-				LoadCollisionModel(work_buff+24, *model, modelname);
+				LoadCollisionModel(buf+24, *model, modelname);
 				mi->SetColModel(model, true);
 			}
 		}else{
 			debug("colmodel %s can't find a modelinfo\n", modelname);
 		}
+		if(buf != work_buff)
+			delete[] buf;
 	}
 
 	CFileMgr::CloseFile(fd);
@@ -1292,6 +1300,19 @@ CFileLoader::LoadVehicleObject(const char *line)
 		assert(0);
 
 	mi->m_handlingId = mod_HandlingManager.GetHandlingId(handlingId);
+
+#ifdef CTW_PROTOTYPE
+	// The first of Chinatown Wars' cars (tools/ctw2re3 names them ctw...) replaces Liberty City's in traffic:
+	// clear the classes default.ide filled. Police, gang cars and the like are not in the classes.
+	static bool ctwCarsLoaded;
+	if(!ctwCarsLoaded && strncmp(model, "ctw", 3) == 0){
+		ctwCarsLoaded = true;
+		for(int i = 0; i < CCarCtrl::TOTAL_CUSTOM_CLASSES; i++){
+			CCarCtrl::TotalNumOfCarsOfRating[i] = 0;
+			CCarCtrl::NextCarOfRating[i] = 0;
+		}
+	}
+#endif
 
 	// Well this is kinda dumb....
 	if(strcmp(vehclass, "poorfamily") == 0){

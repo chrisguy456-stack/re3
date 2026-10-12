@@ -1074,6 +1074,19 @@ extern bool gbRenderWorld2;
 #ifndef MASTER
 const int   re3_buffsize = 1024;
 static char re3_buff[re3_buffsize];
+
+#ifdef CTW_PROTOTYPE
+// CTW builds also copy everything re3 prints to ctw.log in the game folder, flushed as it is written, so a run that
+// stops responding still leaves a record of how far it got
+void ctw_log(const char *text)
+{
+	static FILE *f = fopen("ctw.log", "w");
+	if(f){
+		fputs(text, f);
+		fflush(f);
+	}
+}
+#endif
 #endif
 
 #ifndef MASTER
@@ -1102,6 +1115,9 @@ void re3_assert(const char *expr, const char *filename, unsigned int lineno, con
 	strcat_s(re3_buff, re3_buffsize, "\n");
 
 	strcat_s(re3_buff, re3_buffsize, "\n" );
+#ifdef CTW_PROTOTYPE
+	ctw_log(re3_buff);
+#endif
 	strcat_s(re3_buff, re3_buffsize, "(Press Retry to debug the application)");
 
 
@@ -1145,6 +1161,9 @@ void re3_debug(const char *format, ...)
 	va_end(va);
 
 	printf("%s", re3_buff);
+#ifdef CTW_PROTOTYPE
+	ctw_log(re3_buff);
+#endif
 	CDebug::DebugAddText(re3_buff);
 #endif
 }
@@ -1168,6 +1187,9 @@ void re3_trace(const char *filename, unsigned int lineno, const char *func, cons
 #endif
 
 	OutputDebugString(buff);
+#ifdef CTW_PROTOTYPE
+	ctw_log(buff);
+#endif
 }
 #endif
 
@@ -1179,6 +1201,11 @@ void re3_usererror(const char *format, ...)
 #ifdef _WIN32
 	vsprintf_s(re3_buff, re3_buffsize, format, va);
 	va_end(va);
+#ifdef CTW_PROTOTYPE
+	ctw_log("RE3 Error: ");
+	ctw_log(re3_buff);
+	ctw_log("\n");
+#endif
 	
 	::MessageBoxA(nil, re3_buff, "RE3 Error!",
 		MB_OK|MB_ICONHAND|MB_SETFOREGROUND|MB_TASKMODAL);

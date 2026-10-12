@@ -19,6 +19,7 @@ endif()
 set(${PROJECT}_AUDIO "OAL" CACHE STRING "Audio")
 
 option(${PROJECT}_WITH_OPUS "Build ${EXECUTABLE} with opus support" OFF)
+option(${PROJECT}_CTW_PROTOTYPE "Load the GTA: Chinatown Wars city converted by tools/ctw2re3" OFF)
 option(${PROJECT}_WITH_LIBSNDFILE "Build ${EXECUTABLE} with libsndfile (instead of internal decoder)" OFF)
 
 set_property(CACHE ${PROJECT}_AUDIO PROPERTY STRINGS ${${PROJECT}_AUDIOS})

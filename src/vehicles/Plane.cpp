@@ -652,6 +652,9 @@ CPlane::Render(void)
 void
 CPlane::InitPlanes(void)
 {
+#ifdef CTW_PROTOTYPE
+	return;	// their paths are in Liberty City
+#endif
 	int i;
 
 	CesnaMissionStatus = CESNA_STATUS_NONE;
@@ -838,6 +841,9 @@ CPlane::LoadPath(char const *filename, int32 &numNodes, float &totalLength, bool
 void
 CPlane::UpdatePlanes(void)
 {
+#ifdef CTW_PROTOTYPE
+	return;	// their paths are in Liberty City
+#endif
 	int i, j;
 	uint32 time;
 	float t, deltaT;

@@ -744,6 +744,9 @@ void CRadar::DrawRadarMap()
 	// Game calculates an unused CRect here
 
 	DrawRadarMask();
+#ifdef CTW_PROTOTYPE
+	return;	// no radar map of the Chinatown Wars city yet
+#endif
 
 	// top left ist (0, 0)
 	int x = Floor((vec2DRadarOrigin.x - RADAR_MIN_X) / RADAR_TILE_SIZE);
