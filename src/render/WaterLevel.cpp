@@ -245,6 +245,9 @@ CWaterLevel::Initialise(Const char *pWaterDat)
 void
 CWaterLevel::Shutdown()
 {
+#ifdef CTW_PROTOTYPE
+	return;	// Initialise created nothing to free
+#endif
 	FreeBoatWakeArray();
 	DestroyWavyAtomic();
 
