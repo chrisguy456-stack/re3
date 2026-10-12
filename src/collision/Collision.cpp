@@ -86,6 +86,11 @@ CCollision::Shutdown(void)
 void
 CCollision::Update(void)
 {
+#ifdef CTW_PROTOTYPE
+	// The Chinatown Wars city is one level whose collision is always in memory: no Liberty City islands to swap.
+	// (Without zones, the code below treats the CTW start point as Liberty City's suburbs and requests island models.)
+	return;
+#endif
 	CVector playerCoors;
 	playerCoors = FindPlayerCoors();
 	eLevelName level = CTheZones::m_CurrLevel;
