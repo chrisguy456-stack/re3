@@ -28,6 +28,11 @@ newoption {
 }
 
 newoption {
+	trigger     = "with-ctw",
+	description = "Load the GTA: Chinatown Wars city converted by tools/ctw2re3 (CTW_PROTOTYPE)"
+}
+
+newoption {
 	trigger     = "lto",
 	description = "Use link time optimization"
 }
@@ -228,6 +233,10 @@ project "re3"
 
 	if(_OPTIONS["with-librw"]) then
 		dependson "librw"
+	end
+
+	if _OPTIONS["with-ctw"] then
+		defines { "CTW_PROTOTYPE" }
 	end
 
 	files { addSrcFiles("src") }

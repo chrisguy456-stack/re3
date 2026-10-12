@@ -81,7 +81,11 @@ CRestart::FindClosestHospitalRestartPoint(const CVector &pos, CVector *outPos, f
 	}
 
 	eLevelName curlevel = CTheZones::FindZoneForPoint(pos);
+#ifdef CTW_PROTOTYPE
+	float fMinDist = SQR(20000.0f);
+#else
 	float fMinDist = SQR(4000.0f);
+#endif
 	int closestPoint = NUM_RESTART_POINTS;
 
 	// find closest point on this level
@@ -128,7 +132,11 @@ CRestart::FindClosestPoliceRestartPoint(const CVector &pos, CVector *outPos, flo
 	}
 
 	eLevelName curlevel = CTheZones::FindZoneForPoint(pos);
+#ifdef CTW_PROTOTYPE
+	float fMinDist = SQR(20000.0f);
+#else
 	float fMinDist = SQR(4000.0f);
+#endif
 	int closestPoint = NUM_RESTART_POINTS;
 
 	// find closest point on this level

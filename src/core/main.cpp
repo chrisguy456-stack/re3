@@ -74,6 +74,7 @@
 #include "MemoryHeap.h"
 #ifdef USE_OUR_VERSIONING
 #include "GitSHA1.h"
+#include "ctw.h"
 #endif
 
 GlobalScene Scene;
@@ -1788,7 +1789,11 @@ void
 InitialiseGame(void)
 {
 	LoadingScreen(nil, nil, "loadsc0");
+#ifdef CTW_PROTOTYPE
+	CGame::Initialise(CTW_LEVEL_DAT);
+#else
 	CGame::Initialise("DATA\\GTA3.DAT");
+#endif
 }
 
 RsEventStatus
@@ -1919,7 +1924,11 @@ void TheGame(void)
 #if GTA_VERSION <= GTA3_PS2_160
 	CGame::Initialise();
 #else
+#ifdef CTW_PROTOTYPE
+	CGame::Initialise(CTW_LEVEL_DAT);
+#else
 	CGame::Initialise("DATA\\GTA3.DAT");
+#endif
 #endif
 
 	Const char *splash = GetRandomSplashScreen(); // inlined here

@@ -13,6 +13,8 @@ enum Config {
 	MODELINFOSIZE = 5500,	// 3150 on PS2
 #if defined __MWERKS__ || defined VANILLA_DEFINES
 	TXDSTORESIZE = 850,
+#elif defined CTW_PROTOTYPE
+	TXDSTORESIZE = 4096,	// one texture dictionary per Chinatown Wars city block
 #else
 	TXDSTORESIZE = 1024,	// for Xbox map
 #endif
@@ -34,7 +36,11 @@ enum Config {
 	NUMOBJECTINFO = 168, // object.dat
 
 	// Pool sizes
+#ifdef CTW_PROTOTYPE
+	NUMPTRNODES = 100000, // the Chinatown Wars blocks are 120 units across and span many sectors
+#else
 	NUMPTRNODES = 30000,  // 26000 on PS2
+#endif
 	NUMENTRYINFOS = 5400, // 3200 on PS2
 	NUMPEDS = 140,        // 90 on PS2
 	NUMVEHICLES = 110,    // 70 on PS2

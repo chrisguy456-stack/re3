@@ -58,6 +58,11 @@ void
 CWaterLevel::Initialise(Const char *pWaterDat)
 {
 	ms_nNoOfWaterLevels = 0;
+#ifdef CTW_PROTOTYPE
+	memset(aWaterBlockList, NO_WATER, sizeof(aWaterBlockList));
+	memset(aWaterFineBlockList, NO_WATER, sizeof(aWaterFineBlockList));
+	return;
+#endif
 
 #ifdef MASTER
 	int32 hFile = -1;
@@ -528,6 +533,9 @@ CWaterLevel::RemoveIsolatedWater()
 bool
 CWaterLevel::GetWaterLevel(float fX, float fY, float fZ, float *pfOutLevel, bool bDontCheckZ)
 {
+#ifdef CTW_PROTOTYPE
+	return false;
+#endif
 	int32 x = WATER_HUGE_X(fX);
 	int32 y = WATER_HUGE_Y(fY);
 	
@@ -567,6 +575,9 @@ CWaterLevel::GetWaterLevel(float fX, float fY, float fZ, float *pfOutLevel, bool
 bool
 CWaterLevel::GetWaterLevelNoWaves(float fX, float fY, float fZ, float *pfOutLevel)
 {
+#ifdef CTW_PROTOTYPE
+	return false;
+#endif
 	int32 x = WATER_HUGE_X(fX);
 	int32 y = WATER_HUGE_Y(fY);
 	
@@ -642,6 +653,9 @@ CWaterLevel::RenderWater()
 #ifndef MASTER
 	if (gbDontRenderWater)
 		return;
+#endif
+#ifdef CTW_PROTOTYPE
+	return;
 #endif
 	PUSH_RENDERGROUP("CWaterLevel::RenderWater");
 	bool bUseCamEndX   = false;
@@ -1405,6 +1419,9 @@ float
 CWaterLevel::CalcDistanceToWater(float fX, float fY)
 {
 	const float fSectorMaxRenderDist = 75.0f;
+#ifdef CTW_PROTOTYPE
+	return fSectorMaxRenderDist;
+#endif
 	
 	int32 nStartX = WATER_TO_SMALL_SECTOR_X(fX - fSectorMaxRenderDist) - 1;
 	int32 nEndX   = WATER_TO_SMALL_SECTOR_X(fX + fSectorMaxRenderDist) + 1;

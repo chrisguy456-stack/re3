@@ -1621,7 +1621,7 @@ void
 CWorld::ShutDown(void)
 {
 	for(int i = 0; i < NUMSECTORS_X * NUMSECTORS_Y; i++) {
-		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_Y);
+		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_X);
 		for(CPtrNode *pNode = pSector->m_lists[ENTITYLIST_BUILDINGS].first; pNode; pNode = pNode->next) {
 			CEntity *pEntity = (CEntity *)pNode->item;
 			Remove(pEntity);
@@ -1663,7 +1663,7 @@ CWorld::ShutDown(void)
 		ms_bigBuildingsList[i].Flush();
 	}
 	for(int i = 0; i < NUMSECTORS_X * NUMSECTORS_Y; i++) {
-		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_Y);
+		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_X);
 #ifdef FIX_BUGS
 		pSector->m_lists[ENTITYLIST_BUILDINGS].Flush();
 		pSector->m_lists[ENTITYLIST_BUILDINGS_OVERLAP].Flush();
@@ -1671,31 +1671,31 @@ CWorld::ShutDown(void)
 		pSector->m_lists[ENTITYLIST_DUMMIES_OVERLAP].Flush();
 #endif
 		if(pSector->m_lists[ENTITYLIST_BUILDINGS].first) {
-			sprintf(gString, "Building list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Building list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_BUILDINGS].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_DUMMIES].first) {
-			sprintf(gString, "Dummy list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Dummy list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_DUMMIES].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_BUILDINGS_OVERLAP].first) {
-			sprintf(gString, "Building overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Building overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_BUILDINGS_OVERLAP].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_VEHICLES_OVERLAP].first) {
-			sprintf(gString, "Vehicle overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Vehicle overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_VEHICLES_OVERLAP].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_PEDS_OVERLAP].first) {
-			sprintf(gString, "Ped overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Ped overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_PEDS_OVERLAP].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_OBJECTS_OVERLAP].first) {
-			sprintf(gString, "Object overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Object overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_OBJECTS_OVERLAP].Flush();
 		}
 		if(pSector->m_lists[ENTITYLIST_DUMMIES_OVERLAP].first) {
-			sprintf(gString, "Dummy overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_Y);
+			sprintf(gString, "Dummy overlap list %d,%d not empty\n", i % NUMSECTORS_X, i / NUMSECTORS_X);
 			pSector->m_lists[ENTITYLIST_DUMMIES_OVERLAP].Flush();
 		}
 	}
@@ -1714,7 +1714,7 @@ CWorld::ClearForRestart(void)
 	CObject::DeleteAllMissionObjects();
 	CPopulation::ConvertAllObjectsToDummyObjects();
 	for(int i = 0; i < NUMSECTORS_X * NUMSECTORS_Y; i++) {
-		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_Y);
+		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_X);
 		for(CPtrNode *pNode = pSector->m_lists[ENTITYLIST_PEDS].first; pNode; pNode = pNode->next) {
 			CEntity *pEntity = (CEntity *)pNode->item;
 			Remove(pEntity);
@@ -1814,7 +1814,7 @@ void
 CWorld::RemoveStaticObjects()
 {
 	for(int i = 0; i < NUMSECTORS_X * NUMSECTORS_Y; i++) {
-		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_Y);
+		CSector *pSector = GetSector(i % NUMSECTORS_X, i / NUMSECTORS_X);
 		for(CPtrNode *pNode = pSector->m_lists[ENTITYLIST_BUILDINGS].first; pNode; pNode = pNode->next) {
 			CEntity *pEntity = (CEntity *)pNode->item;
 			Remove(pEntity);

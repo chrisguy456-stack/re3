@@ -63,6 +63,9 @@ CCullZones::ResolveVisibilities(void)
 {
 	int fd;
 
+#ifdef CTW_PROTOTYPE
+	return;	// cullzone.dat describes Liberty City
+#endif
 	CFileMgr::SetDir("");
 	fd = CFileMgr::OpenFile("DATA\\cullzone.dat", "rb");
 	if(fd > 0){

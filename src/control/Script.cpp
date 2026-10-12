@@ -34,6 +34,7 @@
 #include "Wanted.h"
 #include "Weather.h"
 #include "Zones.h"
+#include "ctw.h"
 #ifdef USE_ADVANCED_SCRIPT_DEBUG_OUTPUT
 #include <stdarg.h>
 #endif
@@ -1804,6 +1805,7 @@ void CTheScripts::Init()
 	MissionCleanUp.Init();
 	UpsideDownCars.Init();
 	StuckCars.Init();
+#ifndef CTW_PROTOTYPE	// Liberty City's main.scm does not run in the Chinatown Wars city: the script space stays empty
 	CFileMgr::SetDir("data");
 #ifdef USE_DEBUG_SCRIPT_LOADER
 	int mainf = open_script();
@@ -1813,6 +1815,7 @@ void CTheScripts::Init()
 	CFileMgr::Read(mainf, (char*)ScriptSpace, SIZE_MAIN_SCRIPT);
 	CFileMgr::CloseFile(mainf);
 	CFileMgr::SetDir("");
+#endif
 	StoreVehicleIndex = -1;
 	StoreVehicleWasRandom = true;
 	OnAMissionFlag = 0;
@@ -2012,7 +2015,12 @@ void CTheScripts::Process()
 
 CRunningScript* CTheScripts::StartTestScript()
 {
+#ifdef CTW_PROTOTYPE
+	CCtwPrototype::StartGame();
+	return nil;
+#else
 	return StartNewScript(0);
+#endif
 }
 
 bool CTheScripts::IsPlayerOnAMission()

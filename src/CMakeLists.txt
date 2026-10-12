@@ -51,6 +51,10 @@ endif()
 
 target_compile_definitions(${EXECUTABLE} PRIVATE CMAKE_BUILD)
 
+if(${PROJECT}_CTW_PROTOTYPE)
+    target_compile_definitions(${EXECUTABLE} PRIVATE CTW_PROTOTYPE)
+endif()
+
 if(${PROJECT}_AUDIO STREQUAL "OAL")
     find_package(OpenAL REQUIRED)
     target_include_directories(${EXECUTABLE} PRIVATE ${OPENAL_INCLUDE_DIR})
