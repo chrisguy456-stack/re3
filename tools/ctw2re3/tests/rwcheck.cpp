@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Reads every .dff and .txd of an IMG archive back through librw (the renderer re3 uses), and checks the .col
 // file parses the way CFileLoader::LoadCollisionFile reads it. Prints one line per file; exits 1 on any failure.
+// Textures that come out (nearly) all black are listed at the end. Pass - for the .col to check only an IMG, such
+// as the models/txd.img cache re3 builds on its first run.
 //   rwcheck models/ctw.img models/ctw.dir data/maps/ctw/ctw.col
 #include <rw.h>
 #include <cstdio>
@@ -27,6 +29,8 @@ static std::vector<uint8> readFile(const char *path)
 }
 
 static int failures = 0;
+static int numTextures = 0;
+static std::vector<std::string> darkTextures;
 
 static void checkDff(const char *name, uint8 *data, uint32 size)
 {
@@ -70,13 +74,33 @@ static TexDictionary *checkTxd(const char *name, uint8 *data, uint32 size)
 		Raster *r = t->raster;
 		Image *img = r->toImage();
 		uint8 px[4] = {0, 0, 0, 0};
+		double mean = -1.0;
 		if(img){
 			if(img->depth == 32) memcpy(px, img->pixels, 4);
 			else if(img->depth == 24) memcpy(px, img->pixels, 3), px[3] = 255;
+			if(img->depth == 32 || img->depth == 24){
+				// mean brightness of the opaque-enough pixels
+				int bpp = img->depth / 8;
+				double sum = 0.0;
+				long n = 0;
+				for(int y = 0; y < img->height; y++)
+					for(int x = 0; x < img->width; x++){
+						uint8 *p = img->pixels + y * img->stride + x * bpp;
+						if(bpp == 4 && p[3] < 16) continue;
+						sum += (p[0] + p[1] + p[2]) / 3.0;
+						n++;
+					}
+				mean = n ? sum / n : 0.0;
+			}
 			img->destroy();
 		}
-		printf(" [%s %dx%d fmt 0x%x first pixel %d,%d,%d,%d]", t->name, r->width, r->height, r->format,
-		       px[0], px[1], px[2], px[3]);
+		numTextures++;
+		char desc[160];
+		snprintf(desc, sizeof(desc), "%s/%s %dx%d fmt 0x%x mean %.1f", name, t->name, r->width, r->height, r->format, mean);
+		if(mean >= 0.0 && mean < 12.0)
+			darkTextures.push_back(desc);
+		printf(" [%s %dx%d fmt 0x%x first pixel %d,%d,%d,%d mean %.1f]", t->name, r->width, r->height, r->format,
+		       px[0], px[1], px[2], px[3], mean);
 	}
 	printf("\n");
 	return txd;
@@ -145,7 +169,12 @@ int main(int argc, char **argv)
 		}else if(pass == 0 && ext && strcmp(ext, ".txd") == 0)
 			dicts[std::string(name, ext - name)] = checkTxd(name, data, bytes);
 	}
-	checkCol(argv[3]);
+	if(strcmp(argv[3], "-") != 0)
+		checkCol(argv[3]);
+	printf("%d of %d textures are nearly all black%s\n", (int)darkTextures.size(), numTextures,
+	       darkTextures.empty() ? "" : ":");
+	for(size_t i = 0; i < darkTextures.size(); i++)
+		printf("  dark %s\n", darkTextures[i].c_str());
 	printf(failures ? "%d failures\n" : "all good\n", failures);
 	return failures ? 1 : 0;
 }
