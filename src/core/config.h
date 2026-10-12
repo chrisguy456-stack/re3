@@ -18,7 +18,11 @@ enum Config {
 #else
 	TXDSTORESIZE = 1024,	// for Xbox map
 #endif
+#ifdef CTW_PROTOTYPE
+	EXTRADIRSIZE = 4096,	// Liberty City's models in gta3.img have no model info in a CTW build, so they all go in this directory
+#else
 	EXTRADIRSIZE = 128,
+#endif
 	CUTSCENEDIRSIZE = 512,
 
 	SIMPLEMODELSIZE = 5000,	// 2910 on PS2
