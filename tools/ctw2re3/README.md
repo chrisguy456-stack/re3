@@ -26,7 +26,7 @@ python tools/ctw2re3/ctw2re3.py --ctw-data "C:\Games\GTA Chinatown Wars PC\data"
 It writes into the GTA 3 folder (it does not touch any original file):
 
 ```text
-models/ctw.img, models/ctw.dir      one model and texture dictionary per 120 x 120 city block
+models/ctw.img, models/ctw.dir      models and texture dictionaries per 120 x 120 city block
 data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
 data/maps/ctw/ctw.col               collision, plus a ground plane from the CTW ground map
 data/ctw.dat                        the level file the CTW build loads instead of gta3.dat

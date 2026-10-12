@@ -5,7 +5,7 @@
 Reads your own copy of the game's data (the data/ folder the CTW-Native Porter writes from the Android 4.4.243 APK:
 game.pak, dxt.bin, rom.toc and rom.wad) and writes, under --out (normally your GTA 3 folder):
 
-    models/ctw.img, models/ctw.dir      one model (.dff) and texture dictionary (.txd) per 120 x 120 city block
+    models/ctw.img, models/ctw.dir      models (.dff) and texture dictionaries (.txd), per 120 x 120 city block
     data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
     data/maps/ctw/ctw.col               collision, built from world.bin plus a ground plane from its ground map
     data/ctw.dat                        the level file re3 loads instead of gta3.dat
@@ -190,7 +190,9 @@ def build_block(job):
         for mb, tri in m.triangles():
             translucent = bool(mb['flags'] & 0x08)
             alpha = int(round((mb['alpha'] >> 3) / 31 * 255)) if translucent else 255
-            mk = ('t%d' % mb['texture'], (255, 255, 255, alpha))
+            # CTW draws opaque batches without blending, ignoring the texture's alpha: those use an 'o' copy of the
+            # texture with its alpha thrown away; translucent batches use the texture as it is ('t')
+            mk = (('t%d' if translucent else 'o%d') % mb['texture'], (255, 255, 255, alpha))
             lit = bool(mb['flags'] & 0x07)
             out = []
             for p, n, uv in tri:
@@ -199,23 +201,30 @@ def build_block(job):
                 out.append(((wp[0] - ox, wp[1] - oy, wp[2] + zoff), wn, uv, prelight(wn, lit)))
             tris.append((mk, out))
 
-    # one model normally; more (split by material) if a block has more vertices than a geometry can index
-    parts, cur, verts = [], [], 0
-    by_mat = {}
-    for mk, t in tris:
-        by_mat.setdefault(mk, []).append(t)
-    for mk, ts in by_mat.items():
-        while ts:
-            room = (MAX_VERTS - 3 - verts) // 3
-            if room <= 0:
-                parts.append(cur)
-                cur, verts = [], 0
-                continue
-            take, ts = ts[:room], ts[room:]
-            cur.append((mk, take))
-            verts += 3 * len(take)
-    if cur or not parts:
-        parts.append(cur)
+    # Opaque and translucent surfaces go in separate models, so re3 draws the translucent ones (IDE flag 4) after
+    # everything opaque, as CTW does. Each is split further (by material) if it has more vertices than a geometry
+    # can index. The first model carries the block's collision.
+    parts = []
+    for want_translucent in (False, True):
+        by_mat = {}
+        for mk, t in tris:
+            if (mk[1][3] < 255) == want_translucent:
+                by_mat.setdefault(mk, []).append(t)
+        cur, verts = [], 0
+        for mk, ts in by_mat.items():
+            while ts:
+                room = (MAX_VERTS - 3 - verts) // 3
+                if room <= 0:
+                    parts.append(cur)
+                    cur, verts = [], 0
+                    continue
+                take, ts = ts[:room], ts[room:]
+                cur.append((mk, take))
+                verts += 3 * len(take)
+        if cur:
+            parts.append(cur)
+    if not parts:
+        parts.append([])
 
     out = []
     for i, part in enumerate(parts):
@@ -233,7 +242,8 @@ def build_block(job):
             mesh.tris.append((a, b, c_, mat))
         name = model_name(c, r, i)
         texnames = sorted({t for t, _ in mesh.materials if t})
-        txd = rwwriter.write_txd([(n, texsrc.get(int(n[1:]))) for n in texnames])
+        txd = rwwriter.write_txd([(n, texsrc.get(int(n[1:])) if n[0] == 't' else ctwtex.opaque(texsrc.get(int(n[1:]))))
+                                  for n in texnames])
         lo, hi = mesh.bounds()
         boxes, cverts, ctris = [], [], []
         if i == 0:

@@ -276,6 +276,36 @@ def from_pak(raw):
     return Texture(w, h, 'rgba', bytes(out), _rgba_has_alpha(out))
 
 
+def _opaque_dxt1_block(colour_block):
+    """A DXT3/5 colour block (always four-colour) as a DXT1 block that decodes to the same colours: DXT1 reads
+    colour0 <= colour1 as three colours plus transparent, so those blocks swap the end points and remap indices."""
+    c0, c1, bits = struct.unpack('<HHI', colour_block)
+    if c0 > c1:
+        return colour_block
+    if c0 == c1:
+        return struct.pack('<HHI', c0, c1, 0)   # one colour; index 0 everywhere
+    remap = (1, 0, 3, 2)                        # 0 <-> 1 swaps ends; 2 (2/3 c0) <-> 3 (2/3 c1)
+    nb = 0
+    for i in range(16):
+        nb |= remap[(bits >> (2 * i)) & 3] << (2 * i)
+    return struct.pack('<HHI', c1, c0, nb)
+
+
+def opaque(t):
+    """The texture with its alpha thrown away, for batches CTW draws without blending (render list 0 ignores the
+    texture's alpha). DXT3/5 become DXT1 so re3 neither blends nor alpha-tests them."""
+    if not t.alpha:
+        return t
+    if t.kind == 'rgba':
+        px = bytearray(t.data)
+        px[3::4] = b'\xff' * (len(px) // 4)
+        return Texture(t.w, t.h, 'rgba', bytes(px), False)
+    if t.kind == 'dxt1':
+        return Texture(t.w, t.h, 'dxt1', t.data, False)
+    blocks = [_opaque_dxt1_block(t.data[o + 8:o + 16]) for o in range(0, len(t.data) - 15, 16)]
+    return Texture(t.w, t.h, 'dxt1', b''.join(blocks), False)
+
+
 def placeholder():
     """4 x 4 magenta: makes a texture the converter could not read easy to spot in game."""
     return Texture(4, 4, 'rgba', bytes((255, 0, 255, 255)) * 16, False)

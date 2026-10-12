@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(HERE, '..'))
 sys.path.insert(0, HERE)
 import ctw2re3        # noqa: E402
 import ctwdata        # noqa: E402
+import textures as ctwtex  # noqa: E402
 import make_fixture   # noqa: E402
 
 
@@ -65,19 +66,44 @@ class ConvertFixture(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_one_model_and_txd_per_block(self):
-        self.assertEqual(sorted(self.files), ['ctw_10_5.dff', 'ctw_10_5.txd', 'ctw_11_5.dff', 'ctw_11_5.txd'])
+        # block (10, 5) has translucent surfaces (a see-through material, the sea), which get a model of their own
+        self.assertEqual(sorted(self.files), ['ctw_10_5.dff', 'ctw_10_5.txd', 'ctw_10_5_1.dff', 'ctw_10_5_1.txd',
+                                              'ctw_11_5.dff', 'ctw_11_5.txd'])
         ipl = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.ipl')).read()
         self.assertIn('1000, ctw_10_5, -2250.0000, -1830.0000, 0.0000', ipl)
 
+    def test_translucent_model_drawn_last(self):
+        ide = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.ide')).read()
+        self.assertIn('1000, ctw_10_5, ctw_10_5, 1, 299, 0', ide)
+        self.assertIn('1001, ctw_10_5_1, ctw_10_5_1, 1, 299, 4', ide)
+
+    def test_opaque_copy_of_alpha_texture(self):
+        # DXT5 block whose colour block is in DXT1's three-colour order (colour0 < colour1): the opaque copy must
+        # decode to the same four colours with no transparency
+        c0, c1 = 0x001F, 0xF800
+        bits = 0
+        for i in range(16):
+            bits |= (i % 4) << (2 * i)
+        dxt5 = bytes(8) + struct.pack('<HHI', c0, c1, bits)
+        t = ctwtex.opaque(ctwtex.Texture(4, 4, 'dxt5', dxt5, True))
+        self.assertEqual((t.kind, t.alpha, len(t.data)), ('dxt1', False, 8))
+        n0, n1, nbits = struct.unpack('<HHI', t.data)
+        self.assertGreater(n0, n1)
+        ends = {0: c0, 1: c1, 2: '2/3 c0', 3: '2/3 c1'}
+        new_ends = {0: n0, 1: n1, 2: '2/3 ' + ('c0' if n0 == c0 else 'c1'), 3: '2/3 ' + ('c1' if n1 == c1 else 'c0')}
+        for i in range(16):
+            self.assertEqual(new_ends[(nbits >> (2 * i)) & 3], ends[(bits >> (2 * i)) & 3])
+
     def test_shared_object_converted_once(self):
         # the 8-unit cube listed by both blocks is only in the first one (5 materials there, 2 in the second)
-        p10, p11 = dff_positions(self.files['ctw_10_5.dff']), dff_positions(self.files['ctw_11_5.dff'])
+        p10 = dff_positions(self.files['ctw_10_5.dff']) + dff_positions(self.files['ctw_10_5_1.dff'])
+        p11 = dff_positions(self.files['ctw_11_5.dff'])
         self.assertEqual(len(p10), 44)
         self.assertEqual(len(p11), 20)
 
     def test_positions_are_block_local(self):
         bx, by = ctwdata.block_centre(10, 5)
-        p = dff_positions(self.files['ctw_10_5.dff'])
+        p = dff_positions(self.files['ctw_10_5.dff']) + dff_positions(self.files['ctw_10_5_1.dff'])
         # cube a: 10 units, centred 20 west of the block centre, standing on z 0
         cube = [v for v in p if -25.01 <= v[0] <= -14.99 and -5.01 <= v[1] <= 5.01]
         self.assertEqual(len(cube), 20)
