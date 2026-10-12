@@ -161,10 +161,12 @@ void CGarages::Init(void)
 	hGarages = DMAudio.CreateEntity(AUDIOTYPE_GARAGE, (void*)1);
 	if (hGarages >= 0)
 		DMAudio.SetEntityStatus(hGarages, true);
+#ifndef CTW_PROTOTYPE	// Liberty City's car crusher: its door object is not in the Chinatown Wars city
 	AddOne(
 		CVector(CRUSHER_GARAGE_X1, CRUSHER_GARAGE_Y1, CRUSHER_GARAGE_Z1),
 		CVector(CRUSHER_GARAGE_X2, CRUSHER_GARAGE_Y2, CRUSHER_GARAGE_Z2),
 		GARAGE_CRUSHER, 0);
+#endif
 }
 
 #ifndef PS2
