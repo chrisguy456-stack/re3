@@ -374,11 +374,48 @@ def placeholder():
     return Texture(4, 4, 'rgba', bytes((255, 0, 255, 255)) * 16, False)
 
 
+def crop(t, x0, y0, x1, y1, px=None):
+    """Pixels [x0, x1) x [y0, y1) of a texture (px: its decode(), if already done) as a new opaque RGBA texture."""
+    px, rows = px or decode(t), []
+    for y in range(y0, y1):
+        rows.append(px[(y * t.w + x0) * 4:(y * t.w + x1) * 4])
+    out = bytearray(b''.join(rows))
+    out[3::4] = b'\xff' * (len(out) // 4)
+    return Texture(x1 - x0, y1 - y0, 'rgba', bytes(out), False)
+
+
+DARK = 12    # mean of R, G, B below which a texel counts as black
+
+
 class TextureSource:
     def __init__(self, pak, dxt=None):
         self.pak, self.dxt = pak, dxt
         self.cache = {}
+        self.pixels = {}
         self.missing = set()
+
+    def decoded(self, tid):
+        if tid not in self.pixels:
+            self.pixels[tid] = decode(self.get(tid))
+        return self.pixels[tid]
+
+    def texel(self, tid, u, v):
+        """(r, g, b, a) at texture coordinate (u, v), wrapping as the game's textures do."""
+        self.decoded(tid)
+        t = self.get(tid)
+        x, y = int((u % 1.0) * t.w) % t.w, int((v % 1.0) * t.h) % t.h
+        q = (y * t.w + x) * 4
+        return tuple(self.pixels[tid][q:q + 4])
+
+    def is_dark(self, tid, uvs):
+        """Whether a triangle with these texture coordinates shows only black: its corners and centre are."""
+        cu, cv = sum(u for u, _ in uvs) / 3.0, sum(v for _, v in uvs) / 3.0
+        # corners pulled in a little, so a triangle that ends exactly on a tile's edge samples its own tile
+        for u, v in [(cu + 0.9 * (u - cu), cv + 0.9 * (v - cv)) for u, v in uvs] + [(cu, cv)]:
+            r, g, b, _ = self.texel(tid, u, v)
+            if r + g + b >= 3 * DARK:
+                return False
+        return True
 
     def get(self, tid):
         if tid in self.cache:

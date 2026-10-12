@@ -19,6 +19,10 @@ pedestrians, missions, CTW's own vehicles and characters, real water (swimming, 
 
 Neither game's files are part of this repository; the converter only runs on files you provide.
 
+Chinatown Wars maps most building sides onto a black part of its texture sheets, since its top-down camera hardly
+shows them. From GTA 3's street-level camera they would fill the screen, so the converter gives those walls the
+building's own facade art instead (or the block's most used one), cut out of the sheet and repeated along the wall.
+
 ## 1. Convert the city
 
 ```text

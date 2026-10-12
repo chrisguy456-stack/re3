@@ -172,3 +172,41 @@ class RenderLists(unittest.TestCase):
         files = self.convert(1)
         self.assertIn(b't5\0', files)
         self.assertNotIn(b'a5\0', files)
+
+
+class Facades(unittest.TestCase):
+    """CTW maps most building sides onto black; those walls get the building's own facade tile."""
+
+    def setUp(self):
+        px = bytearray()
+        for y in range(32):
+            for x in range(32):
+                px += bytes((0, 0, 0, 255)) if x < 16 else bytes((200, 150, 100, 255))
+        self.src = ctwtex.TextureSource(None)
+        self.src.cache[9] = ctwtex.Texture(32, 32, 'rgba', bytes(px), False)
+
+    @staticmethod
+    def wall(x0, x1, z0, z1, u0, u1, v0, v1):
+        """Two triangles of a wall in the plane y = 0 from x0 to x1, z0 to z1, textured u0..u1, v0..v1."""
+        n = (0.0, -1.0, 0.0)
+        a, b, c, d = ((x0, 0.0, z0), n, (u0, v1)), ((x1, 0.0, z0), n, (u1, v1)), ((x1, 0.0, z1), n, (u1, v0)), \
+            ((x0, 0.0, z1), n, (u0, v0))
+        mb = {'texture': 9, 'flags': 0x01}
+        return [(mb, [a, b, c]), (mb, [a, c, d])]
+
+    def test_dark_walls_get_the_facade(self):
+        tris = self.wall(0, 4, 0, 8, 0.5, 1.0, 0.0, 1.0) + self.wall(4, 10, 0, 6, 0.0, 0.4, 0.0, 1.0)
+        cands, dark = ctw2re3.facade_tile(self.src, tris)
+        self.assertEqual(dark, {2, 3})
+        key, mu, mv = ctw2re3.pick_tile(self.src, cands)
+        self.assertEqual(key, (9, 16, 0, 32, 32))
+        self.assertAlmostEqual(mu, 4.0, places=3)   # the 16-texel tile spans the 4 m wide wall once
+        self.assertAlmostEqual(mv, 8.0, places=3)
+        uvs = ctw2re3.wall_uvs(tris[2][1], mu, mv)
+        self.assertAlmostEqual(abs(uvs[1][0] - uvs[0][0]), 1.5, places=3)   # 6 m of wall: 1.5 repeats
+        self.assertAlmostEqual(uvs[2][1] - uvs[1][1], -0.75, places=3)     # 6 m up: 3/4 of a repeat
+
+    def test_tile_texture(self):
+        t = ctw2re3.texture_variant(self.src, 'f9_16_0_32_32')
+        self.assertEqual((t.w, t.h, t.kind), (16, 32, 'rgba'))
+        self.assertEqual(t.data[:4], bytes((200, 150, 100, 255)))

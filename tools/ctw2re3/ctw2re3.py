@@ -15,6 +15,7 @@ Nothing from either game is part of this tool; it only runs on files you provide
     python tools/ctw2re3/ctw2re3.py --ctw-data "C:/Games/GTA Chinatown Wars PC/data" --out "C:/Games/GTA3"
 """
 import argparse
+import math
 import multiprocessing
 import os
 import sys
@@ -169,6 +170,84 @@ def prelight(n, lit):
     return (v, v, v, 255)
 
 
+def texture_variant(texsrc, name):
+    """The texture a material name stands for: 'o', 't', 'a' + CTW texture id (see build_block), or a facade tile
+    'f' + id_x0_y0_x1_y1 cut out of a CTW texture."""
+    if name[0] == 'f':
+        tid, x0, y0, x1, y1 = (int(v) for v in name[1:].split('_'))
+        return ctwtex.crop(texsrc.get(tid), x0, y0, x1, y1, texsrc.decoded(tid))
+    t = texsrc.get(int(name[1:]))
+    return {'t': t, 'o': ctwtex.opaque(t), 'a': ctwtex.additive(t)}[name[0]] if name[0] != 'o' or t.alpha else t
+
+
+WALL_NZ = 0.5         # a triangle whose normal has |z| below this is a wall
+MIN_TILE_PIXELS = 8   # facade tiles narrower or shorter than this are trim, not facades
+
+
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def facade_tile(texsrc, model_tris):
+    """For one CTW model: ({(texture id, x0, y0, x1, y1): (wall area, metres per texture coordinate unit)} for
+    the textured opaque walls, the indices of its opaque walls that show only black)."""
+    cands, dark = {}, set()
+    for k, (mb, wtri) in enumerate(model_tris):
+        if mb['flags'] & 0x08:
+            continue
+        p = [v[0] for v in wtri]
+        n = _cross(tuple(p[1][a] - p[0][a] for a in range(3)), tuple(p[2][a] - p[0][a] for a in range(3)))
+        area = (n[0] ** 2 + n[1] ** 2 + n[2] ** 2) ** 0.5 / 2
+        if area < 1e-4 or abs(n[2]) / (2 * area) >= WALL_NZ:
+            continue
+        uvs = [v[2] for v in wtri]
+        tid = mb['texture']
+        if texsrc.is_dark(tid, uvs):
+            dark.add(k)
+            continue
+        t = texsrc.get(tid)
+        us, vs = [u for u, _ in uvs], [v for _, v in uvs]
+        su, sv = math.floor(min(us)), math.floor(min(vs))
+        u0, u1, v0, v1 = min(us) - su, max(us) - su, min(vs) - sv, max(vs) - sv
+        if u1 - u0 > 1 + 1e-4 or v1 - v0 > 1 + 1e-4:
+            rect = (0, 0, t.w, t.h)          # the whole texture repeats across this wall
+        elif u1 > 1 + 1e-4 or v1 > 1 + 1e-4:
+            continue                         # crosses the texture's edge: not one tile
+        else:
+            x0, y0 = int(u0 * t.w + 1e-4), int(v0 * t.h + 1e-4)
+            rect = (x0, y0, min(t.w, max(x0 + 1, math.ceil(u1 * t.w - 1e-4))),
+                    min(t.h, max(y0 + 1, math.ceil(v1 * t.h - 1e-4))))
+        if rect[2] - rect[0] < MIN_TILE_PIXELS or rect[3] - rect[1] < MIN_TILE_PIXELS:
+            continue
+        uv_area = abs((uvs[1][0] - uvs[0][0]) * (uvs[2][1] - uvs[0][1]) - (uvs[2][0] - uvs[0][0]) * (uvs[1][1] - uvs[0][1])) / 2
+        if uv_area < 1e-9:
+            continue
+        key = (tid,) + rect
+        w, s = cands.get(key, (0.0, 0.0))
+        cands[key] = (w + area, s + (area / uv_area) ** 0.5 * area)
+    return {k: (w, s / w) for k, (w, s) in cands.items()}, dark
+
+
+def pick_tile(texsrc, cands):
+    """The candidate covering the most wall: (key, metres along u, metres along v) for one repeat of the tile."""
+    if not cands:
+        return None
+    key, (_, scale) = max(cands.items(), key=lambda kv: (kv[1][0], kv[0]))
+    tid, x0, y0, x1, y1 = key
+    t = texsrc.get(tid)
+    return key, (x1 - x0) / t.w * scale, (y1 - y0) / t.h * scale
+
+
+def wall_uvs(wtri, metres_u, metres_v):
+    """Texture coordinates that repeat a facade tile along a wall: u runs horizontally along the wall, v down it.
+    World coordinates keep neighbouring walls of a building continuous."""
+    p = [v[0] for v in wtri]
+    n = _cross(tuple(p[1][a] - p[0][a] for a in range(3)), tuple(p[2][a] - p[0][a] for a in range(3)))
+    h = (n[0] ** 2 + n[1] ** 2) ** 0.5 or 1.0
+    tx, ty = -n[1] / h, n[0] / h
+    return [((q[0] * tx + q[1] * ty) / metres_u, -q[2] / metres_v) for q in p]
+
+
 def see_through(mk):
     """Whether a material (texture name, rgba) needs blending: translucent batches, whatever their alpha."""
     return mk[1][3] < 255 or (mk[0] is not None and mk[0][0] in 'ta')
@@ -179,6 +258,7 @@ def build_block(job):
     world, texsrc, lists = _worker['world'], _worker['tex'], _worker['lists']
     ox, oy = ctwdata.block_centre(c, r)
     tris = []    # (material key, [(p, n, uv, colour)] x 3)
+    models = []  # (render list index, [(batch, [(world pos, world normal, uv)] x 3)], facade_tile())
     for item in world.instances(c, r):
         if item[1] not in keys:
             continue
@@ -193,7 +273,26 @@ def build_block(job):
             tris += [(mk, [v[0], v[1], v[2]]), (mk, [v[0], v[2], v[3]])]
             continue
         _, _, m, (M, T), list_idx = item
+        model_tris = []
         for mb, tri in m.triangles():
+            wtri = [(tuple(M[a][0] * p[0] + M[a][1] * p[1] + M[a][2] * p[2] + T[a] for a in range(3)),
+                     tuple(M[a][0] * n[0] + M[a][1] * n[1] + M[a][2] * n[2] for a in range(3)), uv) for p, n, uv in tri]
+            model_tris.append((mb, wtri))
+        models.append((list_idx, model_tris, facade_tile(texsrc, model_tris)))
+
+    # CTW's building sides are mostly mapped onto a black part of the texture sheet: from its top-down camera they
+    # are hardly seen. Those walls get the building's own facade art instead (or, for a building without any, the
+    # block's most used one), cut out of the sheet and repeated along the wall.
+    block_tiles = {}
+    for _, _, (cands, _) in models:
+        for key, (weight, scale) in cands.items():
+            w, s = block_tiles.get(key, (0.0, 0.0))
+            block_tiles[key] = (w + weight, s + scale * weight)
+    block_tile = pick_tile(texsrc, {k: (w, s / w) for k, (w, s) in block_tiles.items()})
+
+    for list_idx, model_tris, (cands, dark) in models:
+        tile = pick_tile(texsrc, cands) or block_tile
+        for k, (mb, wtri) in enumerate(model_tris):
             translucent = bool(mb['flags'] & 0x08)
             alpha = int(round((mb['alpha'] >> 3) / 31 * 255)) if translucent else 255
             # Texture name prefixes: CTW draws opaque batches without blending, ignoring the texture's alpha, so
@@ -207,11 +306,14 @@ def build_block(job):
                 # without render_tables.bin: additive layers are the translucent ones whose texture has no alpha
                 prefix = 't' if texsrc.get(mb['texture']).alpha else 'a'
             mk = (prefix + str(mb['texture']), (255, 255, 255, alpha))
+            uvs = [uv for _, _, uv in wtri]
+            if k in dark and tile is not None:
+                (tid, x0, y0, x1, y1), metres_u, metres_v = tile
+                mk = ('f%d_%d_%d_%d_%d' % (tid, x0, y0, x1, y1), (255, 255, 255, 255))
+                uvs = wall_uvs(wtri, metres_u, metres_v)
             lit = bool(mb['flags'] & 0x07)
             out = []
-            for p, n, uv in tri:
-                wp = tuple(M[a][0] * p[0] + M[a][1] * p[1] + M[a][2] * p[2] + T[a] for a in range(3))
-                wn = tuple(M[a][0] * n[0] + M[a][1] * n[1] + M[a][2] * n[2] for a in range(3))
+            for (wp, wn, _), uv in zip(wtri, uvs):
                 out.append(((wp[0] - ox, wp[1] - oy, wp[2] + zoff), wn, uv, prelight(wn, lit)))
             tris.append((mk, out))
 
@@ -256,8 +358,7 @@ def build_block(job):
             mesh.tris.append((a, b, c_, mat))
         name = model_name(c, r, i)
         texnames = sorted({t for t, _ in mesh.materials if t})
-        variant = {'t': lambda t: t, 'o': ctwtex.opaque, 'a': ctwtex.additive}
-        txd = rwwriter.write_txd([(n, variant[n[0]](texsrc.get(int(n[1:])))) for n in texnames])
+        txd = rwwriter.write_txd([(n, texture_variant(texsrc, n)) for n in texnames])
         lo, hi = mesh.bounds()
         boxes, cverts, ctris = [], [], []
         if i == 0:
