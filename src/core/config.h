@@ -39,7 +39,11 @@ enum Config {
 	TIMEMODELSIZE = 30,
 	CLUMPMODELSIZE = 5,
 	PEDMODELSIZE = 90,
+#ifdef CTW_PROTOTYPE
+	VEHICLEMODELSIZE = 250,	// Liberty City's and Chinatown Wars' cars
+#else
 	VEHICLEMODELSIZE = 120,	// 70 on PS2
+#endif
 	XTRACOMPSMODELSIZE = 2,
 	TWODFXSIZE = 2000,	// 1210 on PS2
 

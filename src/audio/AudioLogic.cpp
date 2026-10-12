@@ -588,6 +588,12 @@ cAudioManager::ProcessVehicle(CVehicle *veh)
 		params.m_pTransmission = nil;
 
 	params.m_nIndex = veh->GetModelIndex() - MI_FIRST_VEHICLE;
+#ifdef CTW_PROTOTYPE
+	// Chinatown Wars' cars come after Liberty City's: they sound like the car whose handling line they use, as
+	// handling.cfg lists the cars in model order
+	if(params.m_nIndex < 0 || params.m_nIndex >= MAX_CARS)
+		params.m_nIndex = Min(((CVehicleModelInfo*)CModelInfo::GetModelInfo(veh->GetModelIndex()))->m_handlingId, MAX_CARS - 1);
+#endif
 	if (params.m_pVehicle->GetStatus() == STATUS_SIMPLE)
 		velChange = params.m_pVehicle->AutoPilot.m_fMaxTrafficSpeed * 0.02f;
 	else

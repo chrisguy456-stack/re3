@@ -9,6 +9,7 @@ game.pak, dxt.bin, rom.toc and rom.wad) and writes, under --out (normally your G
     data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
     data/maps/ctw/ctw.col               collision, built from world.bin plus a ground plane from its ground map
     data/maps/ctw/ctw_paths.bin         car and pedestrian paths, from ai.bin and world.bin
+    (and in ctw.img / ctw.ide / ctw.col: CTW's cars, which GTA 3's traffic then drives)
     data/ctw.dat                        the level file re3 loads instead of gta3.dat
 
 Nothing from either game is part of this tool; it only runs on files you provide.
@@ -27,6 +28,7 @@ import ctwdata                      # noqa: E402
 import gtaformats                   # noqa: E402
 import paths                        # noqa: E402
 import rwwriter                     # noqa: E402
+import vehicles                     # noqa: E402
 import textures as ctwtex           # noqa: E402
 
 LIGHT_DIR = (0.35, -0.45, 0.82)     # fake sun for the prelight: CTW lights the city from above
@@ -480,9 +482,18 @@ def main(argv=None):
                 stats['parts'] += 1
             if (n + 1) % 50 == 0 or n + 1 == len(jobs):
                 print('  %d / %d blocks (%.0fs)' % (n + 1, len(jobs), time.time() - t0))
-    img.close(os.path.join(models, 'ctw.dir'))
     _init_worker(a.ctw_data)
     texsrc = _worker['tex']
+    car_files, cars, car_cols, car_tex, car_report = vehicles.convert(pak, texsrc, a.first_id + len(objs))
+    for name, data in car_files:
+        img.add(name, data)
+    if cars:
+        img.add('ctwveh.txd', rwwriter.write_txd([(n, texture_variant(texsrc, n[1:])) for n in sorted(car_tex)]))
+        cols.extend(car_cols)
+    print('%d cars, %d of them in traffic' % (len(cars), sum(1 for c in cars if c[6])))
+    for line in car_report:
+        print('  ' + line)
+    img.close(os.path.join(models, 'ctw.dir'))
     shared_txd = rwwriter.write_txd([(n, texture_variant(texsrc, n)) for n in sorted(shared_names)])
     write(os.path.join(models, 'ctw_shared.txd'), shared_txd)
     missing.update(texsrc.missing)
@@ -495,7 +506,7 @@ def main(argv=None):
         if os.path.exists(path):
             os.remove(path)
             print('removed re3\'s texture cache models/%s; re3 rebuilds it on its next start' % cache)
-    write(os.path.join(maps, 'ctw.ide'), gtaformats.ide(objs))
+    write(os.path.join(maps, 'ctw.ide'), gtaformats.ide(objs, cars))
     write(os.path.join(maps, 'ctw.ipl'), gtaformats.ipl(insts))
     write(os.path.join(maps, 'ctw.col'), b''.join(cols))
     ai = ctwdata.Wad(a.ctw_data).read('ai.bin') if os.path.exists(os.path.join(a.ctw_data, 'rom.toc')) else None

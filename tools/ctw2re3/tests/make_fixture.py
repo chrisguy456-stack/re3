@@ -13,6 +13,7 @@ FX = 4096
 SEA_MODEL, LAKE_MODEL = 900, 901
 BLOCKS = {(10, 5): 2, (11, 5): 3}          # block -> resource id
 TEX_565, TEX_PVR, TEX_DXT, TEX_PNG = 4, 5, 6, 7
+CAR_TABLE, CAR_MODEL = 1994, 1995
 
 
 def cube_model(cx, cy, size, tex_a, tex_b, translucent=False):
@@ -45,6 +46,50 @@ def cube_model(cx, cy, size, tex_a, tex_b, translucent=False):
     recs = struct.pack('<HHBBBBI', tex_a, len(walls), 0x08 if translucent else 0x01, 0, 160, 0, 1)
     recs += struct.pack('<HHBBBBI', tex_b, len(roof), 0x01, 1, 255, 0, 1)
     return head + bb + b''.join(verts) + node + recs
+
+
+def car_model(tex):
+    """A box car on four painted-on wheels, with a door on each side (nodes 1 and 2), all in paint 26."""
+    scale = 1 / 64.0
+
+    def v(x, y, z, nz=1.0):
+        return struct.pack('<8h', int(round(x / scale)), int(round(y / scale)), int(round(z / scale)),
+                           0, 0, int(nz * 32767), 0, 0)
+
+    def quad(a, b, c, d):
+        return [v(*a), v(*b), v(*c), v(*d)]
+
+    body = quad((-1, -2.5, 1.3), (1, -2.5, 1.3), (-1, 2.5, 1.3), (1, 2.5, 1.3))          # roof
+    wheels = []
+    for x in (-1.0, 1.0):
+        for y in (-1.5, 1.5):
+            if wheels:
+                wheels += [wheels[-1], v(x, y - 0.3, 0.0)]
+            wheels += quad((x, y - 0.3, 0.0), (x, y + 0.3, 0.0), (x, y - 0.3, 0.6), (x, y + 0.3, 0.6))
+    door = quad((0, 0, 0.4), (0, -1, 0.4), (0, 0, 1.2), (0, -1, 1.2))                   # hinge at the node
+    verts = body + wheels + door + door
+    head = b'MG' + struct.pack('<HBBH', 0, 3, 4, len(verts)) + b'\0' * 8
+    bb = struct.pack('<6i', -FX, int(-2.5 * FX), 0, FX, int(2.5 * FX), int(1.3 * FX)) + struct.pack('<ff', scale, 1 / scale)
+    nodes = b''.join(struct.pack('<9h', 4096, 0, 0, 0, 4096, 0, 0, 0, 4096) + struct.pack('<bB', 0, 0) +
+                     struct.pack('<3i', int(x * FX), int(0.8 * FX), 0) for x in (-1, 1))
+    paint = 1 << 26
+    recs = struct.pack('<HHBBBBI', tex, len(body), 1, 0, 255, 0, paint)
+    recs += struct.pack('<HHBBBBI', tex, len(wheels), 1, 0, 255, 0, paint)
+    recs += struct.pack('<HHBBBBI', tex, len(door), 1, 1, 255, 0, paint)
+    recs += struct.pack('<HHBBBBI', tex, len(door), 1, 2, 255, 0, paint)
+    return head + bb + b''.join(verts) + nodes + recs
+
+
+def car_table(model):
+    rec = bytearray(0x138)
+    struct.pack_into('<HHI', rec, 0, 0, model, 0x06000000)
+    rec[8:8 + 15] = b'Admiral.vehicle'
+    struct.pack_into('<3h', rec, 0x28, int(1.0 * FX), int(2.5 * FX), int(0.65 * FX))
+    struct.pack_into('<3h', rec, 0x38, int(0.3 * FX), int(1.5 * FX), int(-1.5 * FX))
+    rec[0x94:0x98] = bytes((1, 2, 255, 255))
+    rec[0x110] = 255
+    struct.pack_into('<3i', rec, 0xDC, int(-0.4 * FX), 0, int(0.5 * FX))
+    return struct.pack('<I', 1) + bytes(rec)
 
 
 def build_block(c, r, objects):
@@ -134,6 +179,8 @@ def main(out):
             ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b'')
     p = png(8, 8, bytes((0, 0, 255, 128)) * 64)
     res[TEX_PNG] = struct.pack('<HHHHI', 8, 8, 0xBEEF, 0, len(p)) + p
+    res[CAR_TABLE] = car_table(CAR_MODEL)
+    res[CAR_MODEL] = car_model(TEX_565)
     open(os.path.join(out, 'game.pak'), 'wb').write(pak_bytes(res))
 
     dxt = bytearray(0x8000)

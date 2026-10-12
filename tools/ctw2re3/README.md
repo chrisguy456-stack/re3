@@ -47,6 +47,12 @@ dictionaries there and would keep showing the textures of an earlier conversion.
 The paths are CTW's road network (ai.bin) and pavement nodes (world.bin), with nodes along straight stretches
 merged. The game drives GTA 3's cars and walks its pedestrians on them; without the file the city stays empty.
 
+CTW's cars go in the same files: a model per car in `ctw.img` (textures in `ctwveh.txd`), a `cars` section in
+`ctw.ide` and their collision in `ctw.col`. Each keeps one paint job. The wheels painted on the body are cut out and GTA 3's
+own wheels turn in their place. Every car borrows the handling and engine sound of a similar GTA 3 car (the
+`TRAFFIC` table in `vehicles.py`, which also says which cars drive around); the CTW build then fills its traffic with
+them instead of Liberty City's. `dump_vehicles.py` prints CTW's vehicle table and the parts of each model.
+
 `--area c0,r0,c1,r1` converts only some blocks (the grid is 59 x 42), which is handy for a quick first try.
 `--share-min N` (default 3) moves every texture used by at least N blocks into `ctw_shared.txd` instead of copying
 it into each block; without it the whole city would take about 10 GB. `--jobs N` sets the number of worker processes. The summary at the end lists any texture it could not read; those

@@ -68,7 +68,7 @@ class ConvertFixture(unittest.TestCase):
     def test_one_model_and_txd_per_block(self):
         # block (10, 5) has translucent surfaces (a see-through material, the sea), which get a model of their own
         self.assertEqual(sorted(self.files), ['ctw_10_5.dff', 'ctw_10_5.txd', 'ctw_10_5_1.dff', 'ctw_10_5_1.txd',
-                                              'ctw_11_5.dff', 'ctw_11_5.txd'])
+                                              'ctw_11_5.dff', 'ctw_11_5.txd', 'ctwadmiral.dff', 'ctwveh.txd'])
         ipl = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.ipl')).read()
         self.assertIn('1000, ctw_10_5, -2250.0000, -1830.0000, 0.0000', ipl)
 
@@ -269,3 +269,35 @@ class Paths(unittest.TestCase):
         self.assertEqual(len(crossing), 1)
         a, b = pos[crossing[0][0]], pos[crossing[0][1]]
         self.assertAlmostEqual(min(a[0], b[0]) + 10, pos[0][0])
+
+
+class Vehicles(unittest.TestCase):
+    setUpClass = ConvertFixture.__dict__['setUpClass']
+    tearDownClass = ConvertFixture.__dict__['tearDownClass']
+
+    def test_car_definition(self):
+        ide = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.ide')).read()
+        self.assertIn('cars\n1003, ctwadmiral, ctwveh, car, SENTINEL, ctwadmiral, richfamily, 10, 0, 0, 250, 0.600', ide)
+
+    def test_car_frames(self):
+        dff = self.files['ctwadmiral.dff']
+        for name in (b'chassis_hi', b'chassis_vlo', b'wheel_lf_dummy', b'wheel_rb_dummy', b'door_lf_dummy',
+                     b'door_rf_hi_ok', b'door_rf_hi_dam', b'ped_frontseat'):
+            self.assertIn(name, dff)
+        self.assertNotIn(b'door_lr_dummy', dff)
+
+    def test_painted_wheels_cut_from_the_body(self):
+        # the first geometry is the body: the roof's four corners are all that is left
+        p = self.files['ctwadmiral.dff'].find(struct.pack('<I', 0x0F))
+        self.assertGreater(p, 0)
+        flags, nt, nv, _ = struct.unpack_from('<iiii', self.files['ctwadmiral.dff'], p + 24)
+        self.assertEqual((nt, nv), (2, 4))
+
+    def test_car_collision(self):
+        col = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw.col'), 'rb').read()
+        p = col.find(b'ctwadmiral')
+        self.assertGreater(p, 0)
+        spheres, = struct.unpack_from('<I', col, p + 24 + 40)
+        lines, = struct.unpack_from('<I', col, p + 24 + 44 + spheres * 20)
+        self.assertGreaterEqual(spheres, 2)
+        self.assertEqual(lines, 4)

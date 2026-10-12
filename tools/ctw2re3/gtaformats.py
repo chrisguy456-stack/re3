@@ -6,13 +6,16 @@ import struct
 SECTOR = 2048
 
 
-def col1(name, bmin, bmax, boxes=(), verts=(), tris=()):
-    """One COL1 model. boxes: (min, max, surface); tris: (a, b, c, surface). Coordinates are model-local."""
+def col1(name, bmin, bmax, boxes=(), verts=(), tris=(), spheres=(), lines=()):
+    """One COL1 model. boxes: (min, max, surface); tris: (a, b, c, surface); spheres: (centre, radius, surface);
+    lines: (start, end). Coordinates are model-local."""
     centre = tuple((bmin[i] + bmax[i]) / 2 for i in range(3))
     radius = math.sqrt(sum((bmax[i] - bmin[i]) ** 2 for i in range(3))) / 2
     d = struct.pack('<f3f3f3f', radius, *centre, *bmin, *bmax)
-    d += struct.pack('<I', 0)                  # spheres
-    d += struct.pack('<I', 0)                  # lines
+    d += struct.pack('<I', len(spheres))
+    d += b''.join(struct.pack('<f3fBBxx', r, *c, surf, 0) for c, r, surf in spheres)
+    d += struct.pack('<I', len(lines))
+    d += b''.join(struct.pack('<3f3f', *a, *b) for a, b in lines)
     d += struct.pack('<I', len(boxes))
     d += b''.join(struct.pack('<3f3fBBxx', *lo, *hi, surf, 0) for lo, hi, surf in boxes)
     d += struct.pack('<I', len(verts))
@@ -46,11 +49,17 @@ class ImgWriter:
             f.write(b''.join(self.dir))
 
 
-def ide(objects):
-    """objects: (id, model, txd, draw distance, flags)."""
+def ide(objects, cars=()):
+    """objects: (id, model, txd, draw distance, flags); cars: (id, model, txd, handling id, game name, class,
+    frequency, wheel model id, wheel scale)."""
     lines = ['# GTA: Chinatown Wars city, converted by tools/ctw2re3', 'objs']
     lines += ['%d, %s, %s, 1, %d, %d' % o for o in objects]
-    lines += ['end', '']
+    lines += ['end']
+    if cars:
+        lines += ['cars']
+        lines += ['%d, %s, %s, car, %s, %s, %s, %d, 0, 0, %d, %.3f' % c for c in cars]
+        lines += ['end']
+    lines += ['']
     return '\n'.join(lines)
 
 

@@ -83,13 +83,16 @@ def _material(texture, rgba):
     return chunk(ID_MATERIAL, body + empty_extension())
 
 
-def _geometry(m):
+def _geometry(m, prelit=True):
+    """prelit: buildings carry their lighting in vertex colours; vehicles are lit by the game instead."""
     nv, nt = len(m.pos), len(m.tris)
     if nv > 0xFFFF:
         raise ValueError('too many vertices for one geometry: %d' % nv)
-    flags = POSITIONS | TEXTURED | PRELIT | NORMALS | MODULATE | (1 << 16)   # one UV set
+    flags = POSITIONS | TEXTURED | NORMALS | MODULATE | (1 << 16)   # one UV set
+    flags |= PRELIT if prelit else LIGHT
     s = struct.pack('<iiii', flags, nt, nv, 1)
-    s += b''.join(struct.pack('<4B', *c) for c in m.col)
+    if prelit:
+        s += b''.join(struct.pack('<4B', *c) for c in m.col)
     s += b''.join(struct.pack('<2f', *uv) for uv in m.uv)
     # librw: v[1] = low half of word 0, v[0] = high half; matId = low half of word 1, v[2] = high half
     s += b''.join(struct.pack('<HHHH', b, a, mat, c) for a, b, c, mat in m.tris)
@@ -120,6 +123,25 @@ def write_dff(m):
     clump += chunk(ID_GEOMETRYLIST, chunk(ID_STRUCT, struct.pack('<i', 1)) + _geometry(m))
     atomic = chunk(ID_STRUCT, struct.pack('<iiii', 0, 0, 5, 0)) + empty_extension()
     clump += chunk(ID_ATOMIC, atomic)
+    return chunk(ID_CLUMP, clump + empty_extension())
+
+
+ID_NODENAME = 0x0253F2FE
+
+
+def write_clump(frames, meshes, atomics):
+    """A clump with named frames, for vehicles. frames: (name, parent index or -1, position), all unrotated;
+    meshes: game-lit geometries; atomics: (frame index, mesh index), several atomics may share a mesh."""
+    clump = chunk(ID_STRUCT, struct.pack('<iii', len(atomics), 0, 0))
+    fl = struct.pack('<i', len(frames))
+    for _, parent, pos in frames:
+        fl += struct.pack('<9f3fii', 1, 0, 0, 0, 1, 0, 0, 0, 1, *pos, parent, 0)
+    exts = b''.join(chunk(ID_EXTENSION, chunk(ID_NODENAME, name.encode('ascii'))) for name, _, _ in frames)
+    clump += chunk(ID_FRAMELIST, chunk(ID_STRUCT, fl) + exts)
+    clump += chunk(ID_GEOMETRYLIST, chunk(ID_STRUCT, struct.pack('<i', len(meshes))) +
+                   b''.join(_geometry(m, prelit=False) for m in meshes))
+    for frame, mesh in atomics:
+        clump += chunk(ID_ATOMIC, chunk(ID_STRUCT, struct.pack('<iiii', frame, mesh, 5, 0)) + empty_extension())
     return chunk(ID_CLUMP, clump + empty_extension())
 
 

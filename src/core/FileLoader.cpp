@@ -1301,6 +1301,19 @@ CFileLoader::LoadVehicleObject(const char *line)
 
 	mi->m_handlingId = mod_HandlingManager.GetHandlingId(handlingId);
 
+#ifdef CTW_PROTOTYPE
+	// The first of Chinatown Wars' cars (tools/ctw2re3 names them ctw...) replaces Liberty City's in traffic:
+	// clear the classes default.ide filled. Police, gang cars and the like are not in the classes.
+	static bool ctwCarsLoaded;
+	if(!ctwCarsLoaded && strncmp(model, "ctw", 3) == 0){
+		ctwCarsLoaded = true;
+		for(int i = 0; i < CCarCtrl::TOTAL_CUSTOM_CLASSES; i++){
+			CCarCtrl::TotalNumOfCarsOfRating[i] = 0;
+			CCarCtrl::NextCarOfRating[i] = 0;
+		}
+	}
+#endif
+
 	// Well this is kinda dumb....
 	if(strcmp(vehclass, "poorfamily") == 0){
 		mi->m_vehicleClass = CCarCtrl::POOR;
