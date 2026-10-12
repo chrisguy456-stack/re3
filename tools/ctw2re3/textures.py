@@ -374,6 +374,13 @@ def placeholder():
     return Texture(4, 4, 'rgba', bytes((255, 0, 255, 255)) * 16, False)
 
 
+NO_TEXTURE = 0xFFFF   # a batch drawn without a texture, in its vertex colours only
+
+
+def plain_white():
+    return Texture(4, 4, 'rgba', bytes((255, 255, 255, 255)) * 16, False)
+
+
 def crop(t, x0, y0, x1, y1, px=None):
     """Pixels [x0, x1) x [y0, y1) of a texture (px: its decode(), if already done) as a new opaque RGBA texture."""
     px, rows = px or decode(t), []
@@ -421,7 +428,9 @@ class TextureSource:
         if tid in self.cache:
             return self.cache[tid]
         t = None
-        if self.dxt:
+        if tid == NO_TEXTURE:
+            t = plain_white()
+        if t is None and self.dxt:
             d = self.dxt.get(tid)
             if d:
                 t = from_dxt(*d)

@@ -54,7 +54,7 @@ def dff_positions(dff):
 class ConvertFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory()
+        cls.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # Windows: game.pak stays open
         cls.data = os.path.join(cls.tmp.name, 'ctw')
         cls.out = os.path.join(cls.tmp.name, 'gta3')
         make_fixture.main(cls.data)
@@ -155,7 +155,7 @@ class RenderLists(unittest.TestCase):
     """render_tables.bin decides which translucent batches CTW draws additively."""
 
     def convert(self, list0):
-        tmp = tempfile.TemporaryDirectory()
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # Windows: game.pak stays open
         self.addCleanup(tmp.cleanup)
         data, out = os.path.join(tmp.name, 'ctw'), os.path.join(tmp.name, 'gta3')
         make_fixture.main(data)
@@ -217,7 +217,7 @@ class SharedTextures(unittest.TestCase):
     """Textures enough blocks use are written once, to models/ctw_shared.txd, instead of into every block."""
 
     def test_shared_dictionary(self):
-        tmp = tempfile.TemporaryDirectory()
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # Windows: game.pak stays open
         self.addCleanup(tmp.cleanup)
         data, out = os.path.join(tmp.name, 'ctw'), os.path.join(tmp.name, 'gta3')
         make_fixture.main(data)
