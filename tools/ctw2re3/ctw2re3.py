@@ -333,6 +333,13 @@ def main(argv=None):
             if (n + 1) % 50 == 0 or n + 1 == len(jobs):
                 print('  %d / %d blocks (%.0fs)' % (n + 1, len(jobs), time.time() - t0))
     img.close(os.path.join(models, 'ctw.dir'))
+    # re3 keeps converted copies of every texture dictionary in models/txd.img, made on its first run, and loads
+    # those instead of ours; a cache from an earlier conversion would be stale, so remove it and re3 rebuilds it
+    for cache in ('txd.img', 'txd.dir'):
+        path = os.path.join(models, cache)
+        if os.path.exists(path):
+            os.remove(path)
+            print('removed re3\'s texture cache models/%s; re3 rebuilds it on its next start' % cache)
     write(os.path.join(maps, 'ctw.ide'), gtaformats.ide(objs))
     write(os.path.join(maps, 'ctw.ipl'), gtaformats.ipl(insts))
     write(os.path.join(maps, 'ctw.col'), b''.join(cols))

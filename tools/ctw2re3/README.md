@@ -32,6 +32,10 @@ data/maps/ctw/ctw.col               collision, plus a ground plane from the CTW 
 data/ctw.dat                        the level file the CTW build loads instead of gta3.dat
 ```
 
+It also deletes `models/txd.img` and `models/txd.dir` if they exist: re3 keeps converted copies of all texture
+dictionaries there and would keep showing the textures of an earlier conversion. re3 rebuilds them on its next start
+(a "converting textures" screen).
+
 `--area c0,r0,c1,r1` converts only some blocks (the grid is 59 x 42), which is handy for a quick first try.
 `--jobs N` sets the number of worker processes. The summary at the end lists any texture it could not read; those
 show up magenta in game.
