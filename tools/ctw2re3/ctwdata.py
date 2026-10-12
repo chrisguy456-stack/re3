@@ -295,7 +295,8 @@ class WorldCollision:
     def __init__(self, world_bin):
         self.w = world_bin
 
-    def cell(self, cx, cy):
+    def sections(self, cx, cy):
+        """The 11 length-prefixed sections of a cell, or None."""
         if not (0 <= cx < 100 and 0 <= cy < 100):
             return None
         e, = struct.unpack_from('<I', self.w, (cx * 100 + cy) * 4)
@@ -314,6 +315,16 @@ class WorldCollision:
             n, = struct.unpack_from('<I', d, p)
             secs.append(d[p + 4:p + 4 + n])
             p += 4 + n
+        return secs
+
+    def section(self, cx, cy, i):
+        secs = self.sections(cx, cy)
+        return secs[i] if secs else None
+
+    def cell(self, cx, cy):
+        secs = self.sections(cx, cy)
+        if secs is None:
+            return None
         C = CollisionCell()
 
         def count(s):

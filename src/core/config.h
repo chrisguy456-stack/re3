@@ -77,10 +77,17 @@ enum Config {
 	NUMTEMPOBJECTS = 30,
 
 	// Path data
+#ifdef CTW_PROTOTYPE
+	// the Chinatown Wars city's roads and pavements (tools/ctw2re3/paths.py checks these)
+	NUM_PATHNODES = 65000,
+	NUM_CARPATHLINKS = 40000,
+	NUM_PATHCONNECTIONS = 200000,
+#else
 	NUM_PATHNODES = 4930,
 	NUM_CARPATHLINKS = 2076,
-	NUM_MAPOBJECTS = 1250,
 	NUM_PATHCONNECTIONS = 10260,
+#endif
+	NUM_MAPOBJECTS = 1250,
 
 	// Link list lengths
 	NUMALPHALIST = 20,

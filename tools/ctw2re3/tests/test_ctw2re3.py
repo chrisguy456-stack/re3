@@ -235,3 +235,37 @@ class SharedTextures(unittest.TestCase):
                                 '-', os.path.join(out, 'models', 'ctw_shared.txd')], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn('[o6 a255]', r.stdout)      # found through the shared dictionary
+
+
+class Paths(unittest.TestCase):
+    setUpClass = ConvertFixture.__dict__['setUpClass']
+    tearDownClass = ConvertFixture.__dict__['tearDownClass']
+
+    def read_paths(self):
+        d = open(os.path.join(self.out, 'data', 'maps', 'ctw', 'ctw_paths.bin'), 'rb').read()
+        self.assertEqual(d[:8], b'CTWPATH1')
+        nc, np_, nl = struct.unpack_from('<3I', d, 8)
+        pos = [struct.unpack_from('<3f', d, 20 + 12 * i) for i in range(nc + np_)]
+        p = 20 + 12 * (nc + np_)
+        links = [struct.unpack_from('<2I4B', d, p + 12 * i) for i in range(nl)]
+        return nc, pos, links
+
+    def test_roads(self):
+        nc, pos, links = self.read_paths()
+        x0, y0 = pos[0][0] - 20, pos[0][1] + 10
+        # the straight two-way stretch loses its middle node; the restricted and boat nodes are left out
+        self.assertEqual(nc, 3)
+        self.assertEqual([p[:2] for p in pos[:3]], [(x0 + 20, y0 - 10), (x0 + 20, y0 + 20), (x0 + 20, y0 + 40)])
+        car = [l[:4] for l in links if l[0] < nc]
+        # two-way: a lane each way; one-way from node 1 to node 2: lanes "from a to b" only
+        self.assertEqual(car, [(0, 1, 1, 1), (1, 2, 0, 1)])
+
+    def test_pavements_join_across_cells_and_cross_the_road(self):
+        nc, pos, links = self.read_paths()
+        ped = [l for l in links if l[0] >= nc]
+        self.assertEqual(len(pos) - nc, 5)    # the edge node of both cells is one node
+        self.assertEqual(len(ped), 4)
+        crossing = [l for l in ped if l[4] & 1]
+        self.assertEqual(len(crossing), 1)
+        a, b = pos[crossing[0][0]], pos[crossing[0][1]]
+        self.assertAlmostEqual(min(a[0], b[0]) + 10, pos[0][0])

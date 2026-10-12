@@ -54,6 +54,12 @@ public:
 	static void AddBlockadeSectorList(CPtrList& list, CPedPathNode(*pathNodes)[40], CVector *pPosition);
 };
 
+#ifdef CTW_PROTOTYPE
+typedef int32 PathIndex;	// the Chinatown Wars city has more path nodes and links than an int16 holds
+#else
+typedef int16 PathIndex;
+#endif
+
 struct CPathNode
 {
 	CVector pos;
@@ -61,7 +67,7 @@ struct CPathNode
 	CPathNode *next;
 	int16 distance;		// in path search
 	int16 objectIndex;
-	int16 firstLink;
+	PathIndex firstLink;
 	uint8 numLinks;
 
 	uint8 unkBits : 2;
@@ -96,7 +102,7 @@ struct CCarPathLink
 {
 	CVector2D pos;
 	CVector2D dir;
-	int16 pathNodeIndex;
+	PathIndex pathNodeIndex;
 	int8 numLeftLanes;
 	int8 numRightLanes;
 	uint8 trafficLightType;
@@ -160,16 +166,16 @@ public:
 	CCarPathLink m_carPathLinks[NUM_CARPATHLINKS];
 	CTreadable *m_mapObjects[NUM_MAPOBJECTS];
 	uint8 m_objectFlags[NUM_MAPOBJECTS];
-	int16 m_connections[NUM_PATHCONNECTIONS];
+	PathIndex m_connections[NUM_PATHCONNECTIONS];
 	int16 m_distances[NUM_PATHCONNECTIONS];
 	CConnectionFlags m_connectionFlags[NUM_PATHCONNECTIONS];
-	int16 m_carPathConnections[NUM_PATHCONNECTIONS];
+	PathIndex m_carPathConnections[NUM_PATHCONNECTIONS];
 
 	int32 m_numPathNodes;
 	int32 m_numCarPathNodes;
 	int32 m_numPedPathNodes;
 	int16 m_numMapObjects;
-	int16 m_numConnections;
+	PathIndex m_numConnections;
 	int32 m_numCarPathLinks;
 	int32 unk;
 	uint8 m_numGroups[2];
@@ -215,7 +221,7 @@ public:
 	bool TestCoorsCloseness(CVector target, uint8 type, CVector start);
 	void Save(uint8 *buf, uint32 *size);
 	void Load(uint8 *buf, uint32 size);
-	uint16 ConnectedNode(int id) { return m_connections[id]; }
+	int32 ConnectedNode(int id) { return m_connections[id]; }
 	bool ConnectionCrossesRoad(int id) { return m_connectionFlags[id].bCrossesRoad; }
 	bool ConnectionHasTrafficLight(int id) { return m_connectionFlags[id].bTrafficLight; }
 	void ConnectionSetTrafficLight(int id) { m_connectionFlags[id].bTrafficLight = true; }
@@ -223,7 +229,9 @@ public:
 	void DisplayPathData(void);
 };
 
+#ifndef CTW_PROTOTYPE
 VALIDATE_SIZE(CPathFind, 0x49bf4);
+#endif
 
 extern CPathFind ThePaths;
 

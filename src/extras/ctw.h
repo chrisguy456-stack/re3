@@ -19,6 +19,10 @@ public:
 	// Loads models/ctw_shared.txd, the textures many city blocks use, keeps it loaded and makes texture lookups
 	// fall back to it when a block's own dictionary doesn't have the texture.
 	static void LoadSharedTextures(void);
+
+	// Fills the path finder from data/maps/ctw/ctw_paths.bin, CTW's roads and pavements as tools/ctw2re3 writes
+	// them, so traffic and pedestrians have somewhere to go. Called at the end of CPathFind::PreparePathData.
+	static void LoadPaths(void);
 };
 
 #endif

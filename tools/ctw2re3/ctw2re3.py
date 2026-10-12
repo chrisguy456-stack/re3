@@ -8,6 +8,7 @@ game.pak, dxt.bin, rom.toc and rom.wad) and writes, under --out (normally your G
     models/ctw.img, models/ctw.dir      models (.dff) and texture dictionaries (.txd), per 120 x 120 city block
     data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
     data/maps/ctw/ctw.col               collision, built from world.bin plus a ground plane from its ground map
+    data/maps/ctw/ctw_paths.bin         car and pedestrian paths, from ai.bin and world.bin
     data/ctw.dat                        the level file re3 loads instead of gta3.dat
 
 Nothing from either game is part of this tool; it only runs on files you provide.
@@ -24,6 +25,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ctwdata                      # noqa: E402
 import gtaformats                   # noqa: E402
+import paths                        # noqa: E402
 import rwwriter                     # noqa: E402
 import textures as ctwtex           # noqa: E402
 
@@ -496,6 +498,20 @@ def main(argv=None):
     write(os.path.join(maps, 'ctw.ide'), gtaformats.ide(objs))
     write(os.path.join(maps, 'ctw.ipl'), gtaformats.ipl(insts))
     write(os.path.join(maps, 'ctw.col'), b''.join(cols))
+    ai = ctwdata.Wad(a.ctw_data).read('ai.bin') if os.path.exists(os.path.join(a.ctw_data, 'rom.toc')) else None
+    if ai is None and wb is None:
+        print('warning: neither ai.bin nor world.bin found, the city will have no traffic or pedestrians')
+    else:
+        if ai is None:
+            print('warning: ai.bin not found, the city will have no traffic')
+        data, ps = paths.build(ai, wb, a.z_offset)
+        write(os.path.join(maps, 'ctw_paths.bin'), data)
+        print('paths: %d road nodes and %d links (from %d and %d), %d pavement nodes and %d links (from %d and %d), '
+              '%d pavement links cross a road'
+              % (ps['car_nodes'], ps['car_links'], ps['raw_car'][0], ps['raw_car'][1], ps['ped_nodes'],
+                 ps['ped_links'], ps['raw_ped'][0], ps['raw_ped'][1], ps['crossings']))
+        if ps.get('trimmed'):
+            print('warning: some pavement paths were left out, there are more than re3 holds')
     write(os.path.join(a.out, 'data', 'ctw.dat'), '\n'.join([
         '# GTA: Chinatown Wars city for re3 (CTW_PROTOTYPE), written by tools/ctw2re3',
         'CDIMAGE MODELS\\CTW.IMG',

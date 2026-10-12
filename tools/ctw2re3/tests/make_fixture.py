@@ -143,8 +143,23 @@ def main(out):
 
     # world.bin: cells covering the first block get a rotated box, an axis-aligned box, a cylinder, a mesh and a
     # ground map (land with a lake corner); every other cell of the two blocks is plain land
-    def cell_data(cx, cy, rich):
+    def path_nodes(nodes):
+        """10-byte CTW path nodes from (x, y, z, flags, [links]); returns (links, nodes) bytes."""
+        links, out = [], b''
+        for x, y, z, flags, to in nodes:
+            out += struct.pack('<HHhhbB', len(links), flags | len(to) << 2, int(x * 8), int(y * 8), int(z * 2), 0)
+            links += to
+        return struct.pack('<%dH' % len(links), *links), out, len(links)
+
+    def pavement(nodes):
+        links, packed, nl = path_nodes(nodes)
+        off = 0x2C + len(links)
+        return bytes(0x20) + struct.pack('<IHHI', off, nl, len(nodes), 0) + links + packed
+
+    def cell_data(cx, cy, rich, walk=None):
         secs = [b''] * 11
+        if walk:
+            secs[3] = pavement(walk)
         g = bytearray(400)
         for row in range(40):
             for col in range(40):
@@ -171,15 +186,35 @@ def main(out):
     y_first = int((ctwdata.ORIGIN_Y + 120 * r0 - ctwdata.CELL_Y0) // 50)
     for cx in range(x_first, x_first + 6):
         for cy in range(y_first, y_first + 3):
-            z = cell_data(cx, cy, cx == x_first + 1 and cy == y_first + 1)
+            # a pavement along y0 + 5 across the first two cells, joined at their shared edge
+            x0, y0 = -3500 + cx * 50, -2500 + cy * 50
+            walk = None
+            if (cx, cy) == (x_first, y_first):
+                walk = [(x0 + 10, y0 + 5, 0, 0, [1]), (x0 + 30, y0 + 5, 0, 0, [2]), (x0 + 50, y0 + 5, 0, 0x80, [])]
+            elif (cx, cy) == (x_first + 1, y_first):
+                walk = [(x0, y0 + 5, 0, 0x80, [1]), (x0 + 20, y0 + 5, 0, 0, [2]), (x0 + 20, y0 + 25, 0, 0, [])]
+            z = cell_data(cx, cy, cx == x_first + 1 and cy == y_first + 1, walk)
             off = len(blob)
             csz = (len(z) + 63) // 64
             blob += z + b'\0' * (csz * 64 - len(z))
             entries[cx * 100 + cy] = (off // 64) | (csz << 17) | (4 << 24)
     struct.pack_into('<10000I', blob, 0, *entries)
     world = bytes(blob)
-    toc = struct.pack('<III', ctwdata.wad_hash('world.bin'), 0, len(world))
-    open(os.path.join(out, 'rom.wad'), 'wb').write(world)
+
+    # ai.bin: a two-way road crossing that pavement at x0 + 20 (r0 - r1, with a node in the middle that goes away),
+    # then a one-way street (r1 -> r3), a restricted node and a boat node, which are left out
+    x0, y0 = -3500 + x_first * 50, -2500 + y_first * 50
+    two = 1 << 5 | 1 << 9
+    road = [(x0 + 20, y0 - 10, 0, two, [1]), (x0 + 20, y0 + 5, 0, two, [0, 2]), (x0 + 20, y0 + 20, 0, two, [1, 3]),
+            (x0 + 20, y0 + 40, 0, 0, [4, 5]), (x0 + 20, y0 + 60, 0, 1 << 11, []), (x0 + 40, y0 + 40, -6, 0, [])]
+    links, packed, nl = path_nodes(road)
+    ai = struct.pack('<4I', nl, len(road), 0, 0x10 + len(links)) + links + packed
+
+    wad, toc = b'', b''
+    for name, d in sorted((('world.bin', world), ('ai.bin', ai)), key=lambda f: ctwdata.wad_hash(f[0])):
+        toc += struct.pack('<III', ctwdata.wad_hash(name), len(wad), len(d))
+        wad += d + b'\0' * (-len(d) % 64)
+    open(os.path.join(out, 'rom.wad'), 'wb').write(wad)
     open(os.path.join(out, 'rom.toc'), 'wb').write(toc)
 
 

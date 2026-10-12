@@ -7,6 +7,9 @@
 #include "World.h"
 #include "Lines.h"	// for debug
 #include "PathFind.h"
+#ifdef CTW_PROTOTYPE
+#include "ctw.h"
+#endif
 
 bool gbShowPedPaths;
 bool gbShowCarPaths;
@@ -448,6 +451,9 @@ CPathFind::PreparePathData(void)
 		delete[] DetachedNodesPeds;
 		DetachedNodesPeds = nil;
 	}
+#ifdef CTW_PROTOTYPE
+	CCtwPrototype::LoadPaths();
+#endif
 	printf("Done with PreparePathData\n");
 }
 
@@ -1435,6 +1441,19 @@ CPathFind::FindNextNodeWandering(uint8 type, CVector coors, CPathNode **lastNode
 	if(lastNode == nil || (node = *lastNode) == nil || (coors - (*lastNode)->GetPosition()).MagnitudeSqr() > 7.0f){
 		// need to find the node we're coming from
 		node = nil;
+#ifdef CTW_PROTOTYPE
+		// the Chinatown Wars city's paths belong to no road objects: start from the nearest node
+		if(m_numMapObjects == 0){
+			int32 nearest = FindNodeClosestToCoors(coors, type, 999999.88f);
+			if(nearest < 0){
+				*nextNode = nil;
+				*nextDir = 0;
+				return;
+			}
+			node = &m_pathNodes[nearest];
+		}else
+#endif
+		{
 		CTreadable *obj = FindRoadObjectClosestToCoors(coors, type);
 		float nodeDist = 1000000000.0f;
 		for(i = 0; i < 12; i++){
@@ -1445,6 +1464,7 @@ CPathFind::FindNextNodeWandering(uint8 type, CVector coors, CPathNode **lastNode
 				nodeDist = dist;
 				node = &m_pathNodes[obj->m_nodeIndices[type][i]];
 			}
+		}
 		}
 	}
 
@@ -1501,7 +1521,7 @@ CPathFind::FindNextNodeWandering(uint8 type, CVector coors, CPathNode **lastNode
 	}
 }
 
-static CPathNode *apNodesToBeCleared[4995];
+static CPathNode *apNodesToBeCleared[NUM_PATHNODES + 65];
 
 void
 CPathFind::DoPathSearch(uint8 type, CVector start, int32 startNodeId, CVector target, CPathNode **nodes, int16 *pNumNodes, int16 maxNumNodes, CVehicle *vehicle, float *pDist, float distLimit, int32 targetNodeId)
@@ -1520,6 +1540,17 @@ CPathFind::DoPathSearch(uint8 type, CVector start, int32 startNodeId, CVector ta
 	// Find start
 	int numPathsToTry;
 	CTreadable *startObj;
+#ifdef CTW_PROTOTYPE
+	// the Chinatown Wars city's paths belong to no road objects: start from the nearest node
+	if(startNodeId < 0 && m_numMapObjects == 0){
+		startNodeId = FindNodeClosestToCoors(start, type, 999999.88f);
+		if(startNodeId < 0){
+			*pNumNodes = 0;
+			if(pDist) *pDist = 100000.0f;
+			return;
+		}
+	}
+#endif
 	if(startNodeId < 0){
 		if(vehicle == nil || (startObj = vehicle->m_treadable[type]) == nil)
 			startObj = FindRoadObjectClosestToCoors(start, type);

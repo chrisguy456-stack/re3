@@ -36,12 +36,16 @@ models/ctw.img, models/ctw.dir      models and texture dictionaries per 120 x 12
 models/ctw_shared.txd               textures used by many blocks, stored once and loaded at start-up
 data/maps/ctw/ctw.ide, ctw.ipl      the block definitions and their placements
 data/maps/ctw/ctw.col               collision, plus a ground plane from the CTW ground map
+data/maps/ctw/ctw_paths.bin         car and pedestrian paths, from ai.bin and world.bin
 data/ctw.dat                        the level file the CTW build loads instead of gta3.dat
 ```
 
 It also deletes `models/txd.img` and `models/txd.dir` if they exist: re3 keeps converted copies of all texture
 dictionaries there and would keep showing the textures of an earlier conversion. re3 rebuilds them on its next start
 (a "converting textures" screen).
+
+The paths are CTW's road network (ai.bin) and pavement nodes (world.bin), with nodes along straight stretches
+merged. The game drives GTA 3's cars and walks its pedestrians on them; without the file the city stays empty.
 
 `--area c0,r0,c1,r1` converts only some blocks (the grid is 59 x 42), which is handy for a quick first try.
 `--share-min N` (default 3) moves every texture used by at least N blocks into `ctw_shared.txd` instead of copying

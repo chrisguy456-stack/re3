@@ -283,7 +283,7 @@ CCarCtrl::GenerateOneRandomCar()
 	while (idInNode < pCurNode->numLinks &&
 		ThePaths.ConnectedNode(idInNode + pCurNode->firstLink) != nextNodeId)
 		idInNode++;
-	int16 connectionId = ThePaths.m_carPathConnections[idInNode + pCurNode->firstLink];
+	int32 connectionId = ThePaths.m_carPathConnections[idInNode + pCurNode->firstLink];
 	CCarPathLink* pPathLink = &ThePaths.m_carPathLinks[connectionId];
 	int16 lanesOnCurrentRoad = pPathLink->pathNodeIndex == nextNodeId ? pPathLink->numLeftLanes : pPathLink->numRightLanes;
 	CVehicleModelInfo* pModelInfo = (CVehicleModelInfo*)CModelInfo::GetModelInfo(carModel);
@@ -369,7 +369,7 @@ CCarCtrl::GenerateOneRandomCar()
 		delete pVehicle;
 		return;
 	}
-	int16 nextConnection = pVehicle->AutoPilot.m_nNextPathNodeInfo;
+	int32 nextConnection = pVehicle->AutoPilot.m_nNextPathNodeInfo;
 	int16 newLink;
 	while (nextConnection == pVehicle->AutoPilot.m_nNextPathNodeInfo){
 		newLink = CGeneral::GetRandomNumber() % pCurNode->numLinks;
