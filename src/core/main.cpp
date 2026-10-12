@@ -651,6 +651,11 @@ LoadingScreen(const char *str1, const char *str2, const char *splashscreen)
 {
 	CSprite2d *splash;
 
+#ifdef CTW_PROTOTYPE
+	// the loading steps go to ctw.log, to show how far loading got
+	if (str1)
+		debug("Loading: %s %s\n", str1, str2 ? str2 : "");
+#endif
 #ifdef DISABLE_LOADING_SCREEN
 	if (str1 && str2)
 		return;

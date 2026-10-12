@@ -491,6 +491,26 @@ RegisterAtomicMemPtrsCB(RpAtomic *atomic, void *data)
 }
 #endif
 
+#ifdef CTW_PROTOTYPE
+// A file that keeps failing to load would be requested again forever, and LoadAllRequestedModels would never return.
+// CTW builds give up on a file after a few failures in a row, and say so in the log.
+static uint8 ctwLoadFailures[NUMSTREAMINFO];
+
+static void
+ReRequestAfterFailure(int32 streamId)
+{
+	if(ctwLoadFailures[streamId] == 5)
+		return;
+	if(++ctwLoadFailures[streamId] < 5)
+		CStreaming::ReRequestModel(streamId);
+	else
+		debug("CTW: giving up on stream id %d after 5 failed loads\n", streamId);
+}
+#define REREQUEST_FAILED(id) ReRequestAfterFailure(id)
+#else
+#define REREQUEST_FAILED(id) ReRequestModel(id)
+#endif
+
 bool
 CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 {
@@ -525,7 +545,7 @@ CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 			// if we're just waiting for it to load, don't remove this
 			RemoveTxd(mi->GetTxdSlot());
 #endif
-			ReRequestModel(streamId);
+			REREQUEST_FAILED(streamId);
 			RwStreamClose(stream, &mem);
 			return false;
 		}
@@ -563,7 +583,7 @@ CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 		if(!success){
 			debug("Failed to load %s\n", CModelInfo::GetModelInfo(streamId)->GetModelName());
 			RemoveModel(streamId);
-			ReRequestModel(streamId);
+			REREQUEST_FAILED(streamId);
 			RwStreamClose(stream, &mem);
 			return false;
 		}
@@ -590,7 +610,7 @@ CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 		if(!success){
 			debug("Failed to load %s.txd\n", CTxdStore::GetTxdName(streamId - STREAM_OFFSET_TXD));
 			RemoveModel(streamId);
-			ReRequestModel(streamId);
+			REREQUEST_FAILED(streamId);
 			RwStreamClose(stream, &mem);
 			return false;
 		}
@@ -600,7 +620,7 @@ CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 
 	// We shouldn't even end up here unless load was successful
 	if(!success){
-		ReRequestModel(streamId);
+		REREQUEST_FAILED(streamId);
 		if(streamId < STREAM_OFFSET_TXD)
 			debug("Failed to load %s.dff\n", mi->GetModelName());
 		else
@@ -648,6 +668,9 @@ CStreaming::ConvertBufferToObject(int8 *buf, int32 streamId)
 			debug("txd %s took %d ms\n", CTxdStore::GetTxdName(streamId - STREAM_OFFSET_TXD), timeDiff);
 	}
 
+#ifdef CTW_PROTOTYPE
+	ctwLoadFailures[streamId] = 0;
+#endif
 	return true;
 }
 
@@ -2087,9 +2110,24 @@ CStreaming::LoadAllRequestedModels(bool priority)
 		DecrementRef(streamId);
 
 		if(ms_aInfoForModel[streamId].GetCdPosnAndSize(posn, size)){
+#ifdef CTW_PROTOTYPE
+			// a read that keeps failing would otherwise be retried forever
+			int tries = 0;
+			bool readOk;
+			do{
+				status = CdStreamRead(0, ms_pStreamingBuffer[0], imgOffset+posn, size);
+				readOk = !CdStreamSync(0) && status != STREAM_NONE;
+			}while(!readOk && ++tries < 5);
+			if(!readOk){
+				debug("CTW: could not read stream id %d (sector %u, %u sectors)\n", streamId, posn, size);
+				ms_aInfoForModel[streamId].m_loadState = STREAMSTATE_NOTLOADED;
+				continue;
+			}
+#else
 			do
 				status = CdStreamRead(0, ms_pStreamingBuffer[0], imgOffset+posn, size);
 			while(CdStreamSync(0) || status == STREAM_NONE);
+#endif
 			ms_aInfoForModel[streamId].m_loadState = STREAMSTATE_READING;
 
 			MakeSpaceFor(size * CDSTREAM_SECTOR_SIZE);

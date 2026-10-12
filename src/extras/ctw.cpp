@@ -27,7 +27,9 @@ CCtwPrototype::StartGame(void)
 	CCarCtrl::CarDensityMultiplier = 0.0f;
 
 	// As COMMAND_CREATE_PLAYER does it
+	debug("CTW: loading the city around %.0f %.0f\n", pos.x, pos.y);
 	CStreaming::LoadScene(pos);
+	debug("CTW: city loaded\n");
 	if(!CStreaming::HasModelLoaded(MI_PLAYER)){
 		CStreaming::RequestSpecialModel(MI_PLAYER, "player", STREAMFLAGS_DONT_REMOVE | STREAMFLAGS_DEPENDENCY);
 		CStreaming::LoadAllRequestedModels(false);
@@ -41,6 +43,7 @@ CCtwPrototype::StartGame(void)
 	player->m_fRotationCur = player->m_fRotationDest = DEGTORAD(StartHeading);
 	player->SetHeading(DEGTORAD(StartHeading));
 	CPlayerPed::ReactivatePlayerPed(0);
+	debug("CTW: player placed at %.1f %.1f %.1f\n", pos.x, pos.y, pos.z);
 
 	CRestart::AddHospitalRestartPoint(pos, StartHeading);
 	CRestart::AddPoliceRestartPoint(pos, StartHeading);
@@ -49,6 +52,7 @@ CCtwPrototype::StartGame(void)
 	TheCamera.SetCameraDirectlyBehindForFollowPed_CamOnAString();
 	TheCamera.RestoreWithJumpCut();
 	TheCamera.Fade(1.0f, FADE_IN);
+	debug("CTW: game started\n");
 }
 
 #endif
