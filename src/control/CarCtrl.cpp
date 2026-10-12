@@ -648,6 +648,16 @@ CCarCtrl::ChooseCarModel(int32 vehclass)
 	{
 		if (TotalNumOfCarsOfRating[vehclass] == 0)
 			debug("ChooseCarModel : No cars of type %d have been declared\n", vehclass);
+#ifdef CTW_PROTOTYPE
+		// A class with no cars would never leave the loop below (Chinatown Wars' special cars all have
+		// frequency 0): take a car from the first class that has some instead
+		if (TotalNumOfCarsOfRating[vehclass] == 0) {
+			for (int32 c = POOR; c <= TAXI; c++)
+				if (TotalNumOfCarsOfRating[c] != 0)
+					return ChooseCarModel(c);
+			return -1;
+		}
+#endif
 		model = CarArrays[vehclass][NextCarOfRating[vehclass]];
 		int32 total = TotalNumOfCarsOfRating[vehclass];
 		NextCarOfRating[vehclass] += CGeneral::GetRandomNumberInRange(1, total);
